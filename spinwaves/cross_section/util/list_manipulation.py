@@ -94,4 +94,7 @@ def coeff(expr, term):
     #added the next two lines
     elif m2:
         return m2[w]
+    
+if __name__ == "__main__":
+    print 'hi'
 
