@@ -154,34 +154,34 @@ def generate_hdef(atom_list,Jij,Sxyz,N_atoms_uc,N_atoms):
 #    print 'generated hdef'
 #    print 'Hdef:', Hdef
 #    print '\nHdef.atoms: ', Hdef.atoms(sympy.Symbol)
-    return Hdef
+    return Hdef.expand()
 
 
 def holstein(Hdef):
-        S = sympy.Symbol('S',real=True)
-        print 'holstein'
-        #print Hdef.atoms(sympy.Symbol)
-        #Hdef=Hdef.expand()
-        #Hdef=Hdef.as_poly(S)
-        p = sympy.Wild('p',exclude='S')
-        q = sympy.Wild('q',exclude='S')
-        r = sympy.Wild('r',exclude='S')
-        l = sympy.Wild('l',exclude='S')
-        #Hlin=Hdef.coeffs[0]*S**2+Hdef.coeffs[1]*S
-        S2coeff=coeff(Hdef,S**2)
-        Scoeff=coeff(Hdef,S)
-        Hlin=None
-        #Hlin=coeff(Hdef,S**2)*S**2+coeff(Hdef,S)*S
-        #print 'S2Coeff', S2coeff
-        #print 'Scoeff',Scoeff
-        if Scoeff!=None and S2coeff!=None:
-            Hlin=coeff(Hdef,S**2)*S**2+coeff(Hdef,S)*S
-        elif Scoeff==None and S2coeff!=None:
-            Hlin=coeff(Hdef,S**2)*S**2
-        elif Scoeff!=None and S2coeff==None:
-            #print 'S'
-            Hlin=coeff(Hdef,S)*S
-        return Hlin
+    S = sympy.Symbol('S',real=True)
+    print 'holstein'
+    #print Hdef.atoms(sympy.Symbol)
+    #Hdef=Hdef.expand()
+    #Hdef=Hdef.as_poly(S)
+    p = sympy.Wild('p',exclude='S')
+    q = sympy.Wild('q',exclude='S')
+    r = sympy.Wild('r',exclude='S')
+    l = sympy.Wild('l',exclude='S')
+    #Hlin=Hdef.coeffs[0]*S**2+Hdef.coeffs[1]*S
+    S2coeff=coeff(Hdef,S**2)
+    Scoeff=coeff(Hdef,S)
+    Hlin=None
+    #Hlin=coeff(Hdef,S**2)*S**2+coeff(Hdef,S)*S
+    #print 'S2Coeff', S2coeff
+    #print 'Scoeff',Scoeff
+    if Scoeff!=None and S2coeff!=None:
+        Hlin=coeff(Hdef,S**2)*S**2+coeff(Hdef,S)*S
+    elif Scoeff==None and S2coeff!=None:
+        Hlin=coeff(Hdef,S**2)*S**2
+    elif Scoeff!=None and S2coeff==None:
+        Hlin=coeff(Hdef,S)*S
+    print Hlin.expand()
+    return Hlin.expand()
 
 
 def fouriertransform(atom_list,Jij,Hlin,k,N_atoms_uc,N_atoms):
@@ -221,7 +221,7 @@ def fouriertransform(atom_list,Jij,Hlin,k,N_atoms_uc,N_atoms):
             cmkdj=sympy.Symbol('cmkd%d'%(j2,),commutative=False,real=True)
             diffr=ri-rj
             kmult=N.dot(k,diffr)
-            t1=1.0/2*(ckdi*cmkdj*exp(-I*kmult)+cmkdi*ckdj*exp(I*kmult)               )
+            t1=1.0/2*(ckdi*cmkdj*exp(-I*kmult)+cmkdi*ckdj*exp(I*kmult))
             t2=1.0/2*(cki*cmkj*exp(I*kmult)+cmki*ckj*exp(-I*kmult))
             t3=1.0/2*(ckdi*ckj*exp(-I*kmult)+cmkdi*cmkj*exp(I*kmult))
             t4=1.0/2*(cki*ckdj*exp(I*kmult)+cmki*cmkdj*exp(-I*kmult))
@@ -259,6 +259,7 @@ def fouriertransform(atom_list,Jij,Hlin,k,N_atoms_uc,N_atoms):
             Hlin=Hlin.subs(f5,t5)
 #            print 'H5',Hlin,Hlin.atoms(sympy.Symbol)
     #print t1
+    print Hlin
     return Hlin#.expand()
 
 
@@ -292,7 +293,7 @@ def applycommutation(atom_list,Jij,Hfou,k,N_atoms_uc,N_atoms):
                 
             Hfou=Hfou.subs(cmkdi*ckdj,ckdj*cmkdi)
     
-    
+    print Hfou.expand()
     return Hfou.expand()
 
 def gen_operator_table(atom_list,N_atoms_uc):
@@ -342,6 +343,7 @@ def gen_XdX(atom_list,operator_table,operator_table_dagger,Hcomm,N_atoms_uc):
     exclude_list=[]
     coeff_list=[]
     #Hcomm=Hcomm.expand(deep = False)
+    #print N_atoms_uc
     XdX=sympy.zeros(2*N_atoms_uc)
     g=sympy.zeros(2*N_atoms_uc)
     for i in range(2*N_atoms_uc):

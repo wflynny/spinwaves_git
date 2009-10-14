@@ -23,6 +23,8 @@ from spinwaves.spinwavecalc.spinwave_calc_file import calculate_dispersion, calc
 #from periodictable import elements
 sys.path.append('C:/tripleaxisproject-local/ tripleaxisproject/trunk/eclipse/src')
 from rescalculator.lattice_calculator import Lattice, Orientation
+from multiprocessing import Pipe
+from copy import deepcopy
 
 # Computes the inner product with a metric tensor
 def inner_prod(vect1,vect2,ten = spm.Matrix([[1,0,0],
@@ -368,7 +370,7 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
 
     # Get Hsave to calculate its eigenvalues
     N_atoms = len(atom_list)
-    Hsave = calculate_dispersion(atom_list,N_atoms_uc,N_atoms,jmats,showEigs=False)
+    Hsave,poly,heigs = calculate_dispersion(atom_list,N_atoms_uc,N_atoms,jmats,showEigs=True)
     atom_list=atom_list[:N_atoms_uc]
     N_atoms = len(atom_list)
     N = N_atoms
@@ -430,9 +432,11 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
 
     eig_list=[]
 #    print qlist
+    eigs = Hsave.eigenvals().keys()
     for q in qlist:
         #eigs = calc_eigs_direct(Hsave,q[:,0],q[:,1],q[:,2])
-        eigs = Hsave.eigenvals().keys()
+        #eigs = Hsave.eigenvals().keys()
+        print eigs
         eig_list.append(eigs)
     print "Calculated: Eigenvalues"
     
@@ -494,13 +498,11 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     
     print csection
     
- 
-    
-    csection=sp.powsimp(csection)
-    csection = (csection * exp(-I*w*t) * exp(I*kap*L)).expand(deep = False)
+    csection = (csection * exp(-I*w*t) * exp(I*kap*L)).expand()
+    csection = sp.powsimp(csection, deep=True)
     print 'intermediate'
-    #print csection
-    csection= sp.powsimp(csection)
+    print csection
+    csection = sp.powsimp(csection)
     csection = sub_in(csection,exp(I*t*A + I*t*B + I*C + I*D + I*K),sp.DiracDelta(A*t + B*t + C + D + K))
     csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),sp.DiracDelta(A*hbar + B*hbar)*sp.simplify(sp.DiracDelta(C + D  - tau)))  #This is correct
     #csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),sp.simplify(lifetime*sp.DiracDelta(C + D  - tau)*
@@ -543,6 +545,11 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
 def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list, kapvect, wtlist):    
     print "begin part 2"
     
+    print 'kap',len(kaprange)
+    print 'tau',len(tau_list)
+    print 'eig',len(eig_list)
+    print 'wt ',len(wtlist)
+    
     gamr0 = 2*0.2695e-12 #sp.Symbol('gamma', commutative = True)
     hbar = sp.S(1.0) # 1.05457148*10**(-34) #sp.Symbol('hbar', commutative = True)
     g = 2.#sp.Symbol('g', commutative = True)
@@ -560,24 +567,32 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list
     kapyhat = sp.Symbol('kapyhat',real=True)
     kapzhat = sp.Symbol('kapzhat',real=True)    
 
+    A = sp.Wild('A',exclude = [0,t])
+    B = sp.Wild('B',exclude = [0,t])
+    C = sp.Wild('C')
+    D = sp.Wild('D')
+    K = sp.Wild('K')
+
     kapunit = kapvect.copy()
     kapunit[:,0]=kapvect[:,0]/kaprange
     kapunit[:,1]=kapvect[:,1]/kaprange
     kapunit[:,2]=kapvect[:,2]/kaprange    
     
     nkpts = len(kaprange)
-    nqpts = 2*nkpts
+    nqpts = len(qlist)
+    print 'kpts',nkpts
+    print 'qpts',nqpts
     
     csdata=[]
     wq = sp.Symbol('wq', real = True)
 
-    for k in range(len(tau_list)):
+    for tindex in range(len(tau_list)):
         temp1=[]
-        for g in range(nqpts):
+        for qindex in range(nqpts):
             temp2=[]
-            for i in range(len(eig_list[k][g])):
+            for eindex in range(len(eig_list[qindex])):
                 #temp = eval_it(k,g,i,nkpts,csection)
-                temp=csection
+                temp = deepcopy(csection)
 
                 for num in range(N_atoms_uc):
                     nq = sp.Symbol('n%i'%(num,), real = True)
@@ -586,31 +601,31 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list
                     temp = temp.subs(nq,n)
                     
                 #if g==0:
-                if g<nkpts:
-                    value = kapvect[g]-tau_list[k] - qlist[k][g]
+                if qindex < nkpts:
+                    value = kapvect[qindex]-tau_list[tindex] - qlist[tindex][qindex]
                     if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
                         temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
                         temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1)) # recall that the delta function is symmetric
                     else:
                         temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(0))
                         temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(0))
-                    temp = temp.subs(kapxhat,kapunit[g,0])
-                    temp = temp.subs(kapyhat,kapunit[g,1])
-                    temp = temp.subs(kapzhat,kapunit[g,2])
+                    temp = temp.subs(kapxhat,kapunit[qindex,0])
+                    temp = temp.subs(kapyhat,kapunit[qindex,1])
+                    temp = temp.subs(kapzhat,kapunit[qindex,2])
                 #value =kapvect[g//2]- tau_list[k] + qlist[k][g] 
                 #if g%2!=0:
-                elif g>=nkpts:
-                    value = kapvect[g-nkpts]-tau_list[k] - qlist[k][g]
+                elif qindex >= nkpts:
+                    value = kapvect[qindex-nkpts]-tau_list[tindex] - qlist[tindex][qindex]
                     if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
                         temp = temp.subs(sp.DiracDelta(kap-tau+Q),sp.S(1))
                         temp = temp.subs(sp.DiracDelta(-kap+tau-Q),sp.S(1))
                     else:
                         temp = temp.subs(sp.DiracDelta(kap-tau+Q),sp.S(0))
                         temp = temp.subs(sp.DiracDelta(-kap+tau-Q),sp.S(0))
-                    temp = temp.subs(kapxhat,kapunit[g-nkpts,0])
-                    temp = temp.subs(kapyhat,kapunit[g-nkpts,1])
-                    temp = temp.subs(kapzhat,kapunit[g-nkpts,2])                    
-                value=tau_list[k]      
+                    temp = temp.subs(kapxhat,kapunit[qindex-nkpts,0])
+                    temp = temp.subs(kapyhat,kapunit[qindex-nkpts,1])
+                    temp = temp.subs(kapzhat,kapunit[qindex-nkpts,2])                    
+                value = tau_list[tindex]      
                 if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
                     temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
                     temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1)) #
@@ -622,25 +637,25 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list
                 #temp = temp.subs(kapzhat,kapunit[g//2,2])
                 
                 
-                value = eig_list[k][g][i] - wtlist[g] 
+                #value = eig_list[tindex][qindex][eindex] - wtlist[qindex] 
                 #print '1',temp
-                temp = temp.subs(wq,eig_list[k][g][i])
+                temp = temp.subs(wq,eig_list[qindex][eindex])
 
-                temp=temp.subs(w,wtlist[g])
+                temp=temp.subs(w,wtlist[qindex])
                 if 0:
                     if eq(value,0) == 0:
                         temp = temp.subs(sp.DiracDelta(wq - w), sp.S(1))
                     else: 
                         temp = temp.subs(sp.DiracDelta(wq - w), sp.S(0))
                 if 0:
-                    if eq(eig_list[k][g][i], wtlist[g]) == 0:
+                    if eq(eig_list[qindex][eindex], wtlist[qindex]) == 0:
                         G=sp.Wild('G', exclude = [Q,kap,tau,w])
                         temp=sub_in(temp, sp.DiracDelta(G - A*w), sp.S(1))
-                    elif eq(eig_list[k][g][i], -wtlist[g]) == 0:
+                    elif eq(eig_list[qindex][eindex], -wtlist[qindex]) == 0:
                         G=sp.Wild('G', exclude = [Q,kap,tau,w])
                         temp=sub_in(temp, sp.DiracDelta(G - A*w), sp.S(1))
                     else:
-                        temp = temp.subs(w,wtlist[g])
+                        temp = temp.subs(w,wtlist[qindex])
 
 #                print '4',temp
                 temp2.append(temp)
@@ -851,18 +866,18 @@ def run_eval_cross_section(N_atoms_uc,csection,kaprange,qlist,tau_list,eig_list,
 
 if __name__=='__main__':
     
-    interfile = 'c:/eig_test_montecarlo.txt'
-    spinfile = 'c:/eig_test_Spins.txt'    
+    interfile = 'c:/Users/Bill/Documents/montecarlo.txt'#'c:/montecarlo.txt'
+    spinfile = 'c:/Users/Bill/Documents/spins.txt'#'c:/Spins.txt'
     
     N_atoms_uc,csection,kaprange,qlist,tau_list,eig_list,kapvect,wtlist = run_cross_section(interfile,spinfile)
-    left_conn, right_conn = Pipe()
-    p = Process(target = create_latex, args = (right_conn, csection, "Cross-Section"))
-    p.start()
-    eig_frame = printing.LaTeXDisplayFrame(self.parent, p.pid, left_conn.recv(), 'Cross-Section')
-    self.process_list.append(p)
-    p.join()
-    p.terminate()
-    #run_eval_cross_section(N_atoms_uc,csection,kaprange,qlist,tau_list,eig_list,kapvect,wtlist)
+#    left_conn, right_conn = Pipe()
+#    p = Process(target = create_latex, args = (right_conn, csection, "Cross-Section"))
+#    p.start()
+#    eig_frame = LaTeXDisplayFrame(self.parent, p.pid, left_conn.recv(), 'Cross-Section')
+#    self.process_list.append(p)
+#    p.join()
+#    p.terminate()
+    run_eval_cross_section(N_atoms_uc,csection,kaprange,qlist,tau_list,eig_list,kapvect,wtlist)
 
 
     ### THINGS LEFT TO DO

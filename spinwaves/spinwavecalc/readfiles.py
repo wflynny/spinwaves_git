@@ -153,14 +153,17 @@ def readFiles(interactionFileStr,spinFileStr, allAtoms=False):
     i=0
     print "AL", atomlist
     while Flag:
+        print 'i',i
+        print 'n',numcell
     #for i in range(len(atomlist)):
         if inDesiredCell(atomlist[i]):
             numcell += 1
-            newAtomList.append(atomlist[i])
+            newAtomList.append(atomlist.pop(i))
         else:
             i=i+1
         if i==len(atomlist)-1:
             Flag=False
+            break
     
     #Add remaining atoms to the new list
     for i in range(len(atomlist)):
