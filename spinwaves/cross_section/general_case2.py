@@ -378,8 +378,8 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     print "Calculated: Dispersion Relation"
 
     # Generate kappa's from (h,k,l)
-    kaprange = []
-    kapvect = []
+    #kaprange = []
+    #kapvect = []
     #if len(h_list) == len(k_list) == len(l_list):
         #for i in range(len(h_list)):
             #kappa = lattice.modvec(h_list[i],k_list[i],l_list[i], 'latticestar')
@@ -494,7 +494,23 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     csection=0
     for i in range(len(arg)):
         for j in range(len(arg[i])):
-            csection=csection+arg[i][j]*unit_vect
+            csection = (csection + arg[i][j]*unit_vect)
+    
+    for i in range(N):
+        ni = sp.Symbol('n%i'%(i,), real = True)
+        np1i = sp.Symbol('np1%i'%(i,), Real = True)
+        csection.subs(ni+1,np1i)
+
+    csection = csection.expand()
+    
+    print csection
+    
+    csection = csection.subs(kapxhat*kapyhat,0)
+    csection = csection.subs(kapxhat*kapzhat,0)
+    csection = csection.subs(kapyhat*kapzhat,0)
+    csection = csection.subs(kapzhat*kapyhat,0)
+    csection = csection.subs(kapzhat*kapxhat,0)
+    csection = csection.subs(kapyhat*kapxhat,0)
     
     print csection
     
@@ -507,9 +523,6 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),sp.DiracDelta(A*hbar + B*hbar)*sp.simplify(sp.DiracDelta(C + D  - tau)))  #This is correct
     #csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),sp.simplify(lifetime*sp.DiracDelta(C + D  - tau)*
                                                                                  #sp.Pow((A-B)**2+lifetime**2,-1)))
-    print "Applied: Delta Function Conversion"
-   # print csection
-    print 'done'
 
     ## First the exponentials are turned into delta functions:
     #for i in range(len(arg)):
@@ -526,8 +539,7 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
             #arg[i][j] = sub_in(arg[i][j],sp.DiracDelta(-A - B)*sp.DiracDelta(C),sp.DiracDelta(A + B)*sp.DiracDelta(C))
 ##            arg[i][j] = arg[i][j].subs(-w - wq, w + wq)
 ##            print '5', arg[i][j]
-            
-    print "Applied: Delta Function Conversion"
+    
 
     # Subs the actual values for kx,ky,kz, omega_q and n_q into the operator combos
     # The result is basically a nested list:
@@ -536,7 +548,10 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     #    op combos  = [ one combo per atom ]
     #    1 per atom = [ evaluated exp ]
     #
-    csection=sub_in(csection,sp.DiracDelta(-A - B)*sp.DiracDelta(C),sp.DiracDelta(A + B)*sp.DiracDelta(C))
+    csection = sub_in(csection,sp.DiracDelta(-A - B)*sp.DiracDelta(C),sp.DiracDelta(A + B)*sp.DiracDelta(C))
+    print "Applied: Delta Function Conversion"
+    
+    
 
     print "end part 1"
     #print csection
