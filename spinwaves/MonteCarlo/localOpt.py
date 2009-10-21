@@ -9,7 +9,6 @@ Updated on Jul 30, 2009
 import copy
 #from ctypes import c_float, c_int
 from numpy import cos, sin, arctan, arccos, pi,arcsin
-from spinwaves.utilities.mpfit import mpfit
 #from CSim import passAtoms, passMatrices, loadLib
 from simple import readFile
 import spinwaves.spinwavecalc.readfiles as rf
@@ -103,6 +102,8 @@ def opt_aux(atom_list, jmats, spins, tol = 1.0e-25):
         Sx = spinMags*sin(theta)*cos(phi)
         Sy = spinMags*sin(theta)*sin(phi)
         Sz = spinMags*cos(theta)
+#        print 'local opt spins'
+#        print Sx[0], Sy[0], Sz[0]
 
         # Array of spin vectors for each atom. Reshape it. Calculate hamiltonian with it and return the hamiltonian. 
         Sij = np.array([Sx,Sy,Sz])
@@ -193,15 +194,18 @@ def opt_aux(atom_list, jmats, spins, tol = 1.0e-25):
         
         thetas.append(theta)
         phis.append(phi)
+        
+#        print 'initial spins'
+#        print s*sin(theta)*cos(phi), s*sin(theta)*sin(phi), s*cos(theta)
     p0 = np.array(thetas+phis)
 
     # define the limits parameter list
     limits = []
     for i in range(len(p0)):
         if i < len(p0)//2:#theta
-            limits.append((-pi,pi))
+            limits.append((0,pi))
         else:#phi
-            limits.append((0,2*pi))
+            limits.append((-pi,pi))
     
     # call minimizing function
     m = fmin_l_bfgs_b(hamiltonian, p0, fprime = deriv, args = (Jij, spin_mags, anis), pgtol=tol, bounds = limits)

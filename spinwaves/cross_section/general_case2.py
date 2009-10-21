@@ -601,6 +601,41 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list
     csdata=[]
     wq = sp.Symbol('wq', real = True)
 
+#    for tauindex in range(len(tau_list)):
+#        temp1=[]
+#        for kapindex in range(len(kaprange)):
+#            temp2=[]
+#            for qindex in range(nqpts):
+#                temp3=[]
+#                for eigindex in range(len(eig_list[qindex])):
+#                    tempcsec = deepcopy(csection)
+#                    for num in range(N_atoms_uc):
+#                        nq = sp.Symbol('n%i'%(num,), real=True)
+#                        n=sp.S(0.0)
+#                        tempcsec=tempcsec.subs(nq,n)
+#
+#                    if kapindex < nkpts:
+#                        val = kapvect[kapindex]-tau_list[tauindex]-qlist[qindex][0]
+#                        if eq(val[0],0)==0 and eq(val[1],0)==0 and eq(val[2],0)==0:
+#                            tempcsec = tempcsec.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
+#                            tempcsec = tempcsec.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1))
+#                        else:
+#                            tempcsec = tempcsec.subs(sp.DiracDelta(kap-tau-Q),sp.S(0))
+#                            tempcsec = tempcsec.subs(sp.DiracDelta(-kap+tau+Q),sp.S(0))
+#                        tempcsec = tempcsec.subs(kapxhat,kapunit[kapindex,0])
+#                        tempcsec = tempcsec.subs(kapyhat,kapunit[kapindex,1])
+#                        tempcsec = tempcsec.subs(kapzhat,kapunit[kapindex,2])
+#                    elif kapindex > nkpts:
+#                        val = kapvect[kapindex-nkpts]-tau_list[tauindex]-qlist[qindex][0]
+#                        if eq(val[0],0)==0 and eq(val[1],0)==0 and eq(val[2],0)==0:
+#                            tempcsec = tempcsec.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
+#                            tempcsec = tempcsec.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1))
+#                        else:
+#                            tempcsec = tempcsec.subs(sp.DiracDelta(kap-tau-Q),sp.S(0))
+#                            tempcsec = tempcsec.subs(sp.DiracDelta(-kap+tau+Q),sp.S(0))
+#                        tempcsec = tempcsec.subs(kapxhat,kapunit[kapindex,0])
+#                        tempcsec = tempcsec.subs(kapyhat,kapunit[kapindex,1])
+#                        tempcsec = tempcsec.subs(kapzhat,kapunit[kapindex,2])
     for tindex in range(len(tau_list)):
         temp1=[]
         for qindex in range(nqpts):
