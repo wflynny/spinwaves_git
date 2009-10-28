@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/276/trunk/spinwaves/utilities/mpfit
+END
+mpfit.py
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/!svn/ver/267/trunk/spinwaves/utilities/mpfit/mpfit.py
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/!svn/ver/276/trunk/spinwaves/utilities/mpfit/__init__.py
+END
+mpfit_tests.py
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/!svn/ver/265/trunk/spinwaves/utilities/mpfit/mpfit_tests.py
+END
