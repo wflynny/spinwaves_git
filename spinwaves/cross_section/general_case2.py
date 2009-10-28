@@ -179,7 +179,7 @@ def generate_possible_combinations(atom_list, alist):
     op_list = []
     alista = []
     N = len(atom_list)
-    t = sp.Symbol('t', commutative = True)
+    t = sp.Symbol('t', real = True)
     L = sp.Symbol('L', real = True)
     q = sp.Symbol('q', real = True)
     qp = sp.Symbol('qp', real = True)
@@ -201,6 +201,7 @@ def generate_possible_combinations(atom_list, alist):
             allzerolist = [alista[i][0].subs(L,0) for k in range(len(alista[i])-1)]+[delta-vect1*vect2]
             otherlist = [alist[j][k].subs(q,qp).subs(wq,wqp) for k in range(len(alist[j])-1)]+[1]
             append_list = list_mult(allzerolist,otherlist)
+            print 'here',append_list
             op_list.append(append_list)
     print "Generated: Possible Operator Combinations"
     return op_list
@@ -209,13 +210,21 @@ def generate_possible_combinations(atom_list, alist):
 def holstein(atom_list, arg):
     new = []
     N = len(atom_list)
-    S = sp.Symbol('S', commutative = True)
+    S = sp.Symbol('S', real = True)
+    t = sp.Symbol('t', real = True)
     for k in range(len(arg)):
         temp = []
         orig = len(arg[k])
         for i in range(N):
             Snew = atom_list[i].spinMagnitude
-            
+
+            #gets rid of time independent terms
+            #works since arg[k][i] is an Add instance so args breaks it up at '+'s
+            pieces = arg[k][i].args
+            for piece in pieces:
+                if not piece.has(t):
+                    arg[k][i] = arg[k][i] - piece
+
             S2coeff = coeff(arg[k][i], S**2)
             Scoeff = coeff(arg[k][i], S)
             if S2coeff != None and Scoeff != None:
@@ -285,7 +294,7 @@ def apply_commutation(atom_list, arg):
                             arg[k][i] = arg[k][i].subs(bj*bdg, bdg*bj+1)
                         else:
                             arg[k][i] = arg[k][i].subs(bj*bdg, bdg*bj)
-#
+
 #                        if g == j:
 ##                            arg[k][i] = (arg[k][i].subs(bdg*bj, nj))
 ##                            arg[k][i] = (arg[k][i].subs(bj*bdg, (bdg*bj+1)))
@@ -407,7 +416,8 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     qlist=[]
     ones_list=np.ones((1,nkpts),'Float64')
     #wtlist=np.ones((1,nkpts*2),'Float64').flatten()
-    wtlist=np.hstack([w_list,w_list])
+#    wtlist=np.hstack([w_list,w_list])
+    wtlist=w_list
     #weven=np.array(range(0,nkpts*2,2))
     #wodd=np.array(range(1,nkpts*2,2))
     #wtlist[wodd]=w_list
@@ -438,7 +448,9 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
         #eigs = Hsave.eigenvals().keys()
         print eigs
         eig_list.append(eigs)
+    eig_list = np.array(eig_list)
     print "Calculated: Eigenvalues"
+    
     
  #   print len(qlist)
  #   print len(eig_list[0])
@@ -495,6 +507,8 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     for i in range(len(arg)):
         for j in range(len(arg[i])):
             csection = (csection + arg[i][j]*unit_vect)
+            
+    print csection
     
     for i in range(N):
         ni = sp.Symbol('n%i'%(i,), real = True)
@@ -514,7 +528,7 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     
     print csection
     
-    csection = (csection * exp(-I*w*t) * exp(I*kap*L)).expand()
+    csection = (csection * exp(-I*w*t) * exp(I*kap*L)).expand(deep=False)
     csection = sp.powsimp(csection, deep=True)
     print 'intermediate'
     print csection
@@ -548,7 +562,7 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     #    op combos  = [ one combo per atom ]
     #    1 per atom = [ evaluated exp ]
     #
-    csection = sub_in(csection,sp.DiracDelta(-A - B)*sp.DiracDelta(C),sp.DiracDelta(A + B)*sp.DiracDelta(C))
+    csection = sub_in(csection,sp.DiracDelta(-A - B),sp.DiracDelta(A + B))
     print "Applied: Delta Function Conversion"
     
     
@@ -601,137 +615,334 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list
     csdata=[]
     wq = sp.Symbol('wq', real = True)
 
-#    for tauindex in range(len(tau_list)):
-#        temp1=[]
-#        for kapindex in range(len(kaprange)):
-#            temp2=[]
-#            for qindex in range(nqpts):
-#                temp3=[]
-#                for eigindex in range(len(eig_list[qindex])):
-#                    tempcsec = deepcopy(csection)
-#                    for num in range(N_atoms_uc):
-#                        nq = sp.Symbol('n%i'%(num,), real=True)
-#                        n=sp.S(0.0)
-#                        tempcsec=tempcsec.subs(nq,n)
-#
-#                    if kapindex < nkpts:
-#                        val = kapvect[kapindex]-tau_list[tauindex]-qlist[qindex][0]
-#                        if eq(val[0],0)==0 and eq(val[1],0)==0 and eq(val[2],0)==0:
-#                            tempcsec = tempcsec.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
-#                            tempcsec = tempcsec.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1))
-#                        else:
-#                            tempcsec = tempcsec.subs(sp.DiracDelta(kap-tau-Q),sp.S(0))
-#                            tempcsec = tempcsec.subs(sp.DiracDelta(-kap+tau+Q),sp.S(0))
-#                        tempcsec = tempcsec.subs(kapxhat,kapunit[kapindex,0])
-#                        tempcsec = tempcsec.subs(kapyhat,kapunit[kapindex,1])
-#                        tempcsec = tempcsec.subs(kapzhat,kapunit[kapindex,2])
-#                    elif kapindex > nkpts:
-#                        val = kapvect[kapindex-nkpts]-tau_list[tauindex]-qlist[qindex][0]
-#                        if eq(val[0],0)==0 and eq(val[1],0)==0 and eq(val[2],0)==0:
-#                            tempcsec = tempcsec.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
-#                            tempcsec = tempcsec.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1))
-#                        else:
-#                            tempcsec = tempcsec.subs(sp.DiracDelta(kap-tau-Q),sp.S(0))
-#                            tempcsec = tempcsec.subs(sp.DiracDelta(-kap+tau+Q),sp.S(0))
-#                        tempcsec = tempcsec.subs(kapxhat,kapunit[kapindex,0])
-#                        tempcsec = tempcsec.subs(kapyhat,kapunit[kapindex,1])
-#                        tempcsec = tempcsec.subs(kapzhat,kapunit[kapindex,2])
-    for tindex in range(len(tau_list)):
-        temp1=[]
-        for qindex in range(nqpts):
-            temp2=[]
-            for eindex in range(len(eig_list[qindex])):
-                #temp = eval_it(k,g,i,nkpts,csection)
-                temp = deepcopy(csection)
+    print 'eigs eigs eigs eigs eigs eigs'
+    print eig_list
 
-                for num in range(N_atoms_uc):
-                    nq = sp.Symbol('n%i'%(num,), real = True)
-                    #n = sp.Pow( sp.exp(-np.abs(eig_list[k][g][i])/boltz/temperature) - 1 ,-1)
-                    n=sp.S(0.0)
-                    temp = temp.subs(nq,n)
+    if 0:
+        temp1 = []
+        for kapi in range(len(kapvect)):
+            temp2 =[]
+            for taui in range(len(tau_list)):
+    
+                print 'starting'
+    
+                print 'k,t',kapi,taui
+                wplus=[]
+                wmins=[]
+    
+                qplus = kapvect[kapi] + tau_list[taui]
+                qmins = tau_list[taui] - kapvect[kapi]
+    
+                nq = sp.Symbol('n%i'%(taui,), real = True)
+    
+                for eigi in range(len(eig_list[0])):
+                    csectempp = deepcopy(csection)
+                    csectempm = deepcopy(csection)
                     
-                #if g==0:
-                if qindex < nkpts:
-                    value = kapvect[qindex]-tau_list[tindex] - qlist[tindex][qindex]
-                    if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
-                        temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
-                        temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1)) # recall that the delta function is symmetric
-                    else:
-                        temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(0))
-                        temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(0))
-                    temp = temp.subs(kapxhat,kapunit[qindex,0])
-                    temp = temp.subs(kapyhat,kapunit[qindex,1])
-                    temp = temp.subs(kapzhat,kapunit[qindex,2])
-                #value =kapvect[g//2]- tau_list[k] + qlist[k][g] 
-                #if g%2!=0:
-                elif qindex >= nkpts:
-                    value = kapvect[qindex-nkpts]-tau_list[tindex] - qlist[tindex][qindex]
-                    if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
-                        temp = temp.subs(sp.DiracDelta(kap-tau+Q),sp.S(1))
-                        temp = temp.subs(sp.DiracDelta(-kap+tau-Q),sp.S(1))
-                    else:
-                        temp = temp.subs(sp.DiracDelta(kap-tau+Q),sp.S(0))
-                        temp = temp.subs(sp.DiracDelta(-kap+tau-Q),sp.S(0))
-                    temp = temp.subs(kapxhat,kapunit[qindex-nkpts,0])
-                    temp = temp.subs(kapyhat,kapunit[qindex-nkpts,1])
-                    temp = temp.subs(kapzhat,kapunit[qindex-nkpts,2])                    
-                value = tau_list[tindex]      
-                if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
-                    temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
-                    temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1)) #
-                    temp = temp.subs(sp.DiracDelta(kap-tau+Q),sp.S(1))
-                    temp = temp.subs(sp.DiracDelta(-kap+tau-Q),sp.S(1))
+                    if 0:
+                        print 'copy'
+                        print csectempp
+                        print csectempm
+    
+                    spinmag = sp.Symbol('S', real = True)
+                    kx = sp.Symbol('kx', real = True)
+                    ky = sp.Symbol('ky', real = True)
+                    kz = sp.Symbol('kz', real = True)
                     
-                #temp = temp.subs(kapxhat,kapunit[g//2,0])
-                #temp = temp.subs(kapyhat,kapunit[g//2,1])
-                #temp = temp.subs(kapzhat,kapunit[g//2,2])
-                
-                
-                #value = eig_list[tindex][qindex][eindex] - wtlist[qindex] 
-                #print '1',temp
-                temp = temp.subs(wq,eig_list[qindex][eindex])
-
-                temp=temp.subs(w,wtlist[qindex])
-                if 0:
-                    if eq(value,0) == 0:
-                        temp = temp.subs(sp.DiracDelta(wq - w), sp.S(1))
-                    else: 
-                        temp = temp.subs(sp.DiracDelta(wq - w), sp.S(0))
-                if 0:
-                    if eq(eig_list[qindex][eindex], wtlist[qindex]) == 0:
-                        G=sp.Wild('G', exclude = [Q,kap,tau,w])
-                        temp=sub_in(temp, sp.DiracDelta(G - A*w), sp.S(1))
-                    elif eq(eig_list[qindex][eindex], -wtlist[qindex]) == 0:
-                        G=sp.Wild('G', exclude = [Q,kap,tau,w])
-                        temp=sub_in(temp, sp.DiracDelta(G - A*w), sp.S(1))
+                    eig_list[0][eigi] = eig_list[0][eigi].subs(spinmag, sp.S(1.0))
+                    eig_list[0][eigi] = eig_list[0][eigi].subs(kx, qplus[0])
+                    eig_list[0][eigi] = eig_list[0][eigi].subs(ky, qplus[1])
+                    eig_list[0][eigi] = eig_list[0][eigi].subs(kz, qplus[2])
+                    nval = sp.S(0.) #sp.Pow( sp.exp(-np.abs(eig_list[0][eigi])/boltz) - 1 ,-1) #\temperature term taken out
+    
+                    if 0:
+                        print 'kx,ky,kz'
+                        print eig_list[0][eigi]
+    
+                    qvalp = kapvect[kapi] - tau_list[taui] - qplus
+                    qvalm = kapvect[kapi] - tau_list[taui] + qmins
+                    wvalp = (eig_list[0][eigi] - wtlist[kapi]).evalf()
+                    wvalm = (eig_list[0][eigi] + wtlist[kapi]).evalf()
+                    
+    #                csectempp = csectempp.subs(kap - Q - tau, qvalp)
+    #                csectempm = csectempp.subs(kap + Q - tau, qvalm)
+                    csectempp = csectempp.subs(sp.DiracDelta(kap - Q - tau),sp.S(1))
+                    csectempp = csectempp.subs(sp.DiracDelta(kap + Q - tau),sp.S(0))
+                    csectempm = csectempm.subs(sp.DiracDelta(kap - Q - tau),sp.S(0))
+                    csectempm = csectempm.subs(sp.DiracDelta(kap + Q - tau),sp.S(1))
+                    
+                    if 0:
+                        print 'delta(k+q-t)'
+                        print csectempp
+                        print csectempm
+    
+    #                csectempp = csectempp.subs(sp.DiracDelta(w - wq), sp.DiracDelta(wvalp))
+    #                csectempp = csectempp.subs(sp.DiracDelta(wq + w), sp.DiracDelta(wvalm))
+                    if np.abs(wvalp) < 0.1: 
+                        csectempp = csectempp.subs(sp.DiracDelta(w - wq), sp.S(1))
+                        csectempm = csectempm.subs(sp.DiracDelta(w - wq), sp.S(1))
                     else:
-                        temp = temp.subs(w,wtlist[qindex])
-
-#                print '4',temp
-                temp2.append(temp)
+                        csectempp = csectempp.subs(sp.DiracDelta(w - wq), sp.S(0))
+                        csectempm = csectempm.subs(sp.DiracDelta(w - wq), sp.S(0))
+                    if np.abs(wvalm) < 0.1:
+                        csectempp = csectempp.subs(sp.DiracDelta(w + wq), sp.S(1))
+                        csectempm = csectempm.subs(sp.DiracDelta(w + wq), sp.S(1)) 
+                    else:
+                        csectempp = csectempp.subs(sp.DiracDelta(w + wq), sp.S(0))
+                        csectempm = csectempm.subs(sp.DiracDelta(wq + w), sp.S(0))                                        
+    #                csectempm = csectempm.subs(sp.DiracDelta(w - wq), sp.DiracDelta(wvalp))
+    #                csectempm = csectempm.subs(sp.DiracDelta(wq + w), sp.DiracDelta(wvalm))            
+    
+                    csectempp = csectempp.subs(nq,nval)
+                    
+                    if 0:
+                        print 'delta(w-wq)'
+                        print wvalp
+                        print wvalm
+                        print csectempp
+                        print csectempm
+                    
+                    csectempp = csectempp.subs(kapxhat,kapunit[kapi,0])
+                    csectempp = csectempp.subs(kapyhat,kapunit[kapi,1])
+                    csectempp = csectempp.subs(kapzhat,kapunit[kapi,2])
+                    csectempm = csectempm.subs(kapxhat,kapunit[kapi,0])
+                    csectempm = csectempm.subs(kapyhat,kapunit[kapi,1])
+                    csectempm = csectempm.subs(kapzhat,kapunit[kapi,2])
+                    
+                    if 0:
+                        print 'kap unit vecs'
+                        print csectempp
+                        print csectempm
+    
+                    wplus.append(csectempp)
+                    wmins.append(csectempm)
+                
+                wvals = wplus + wmins#np.vstack([wplus,wmins])
+    
+                temp2.append(sum(wvals))
+    
+            print temp2
             temp1.append(temp2)
-        csdata.append(temp1)
+        print temp1
+        print len(temp1)
+        temp1 = np.array(temp1)
+        print temp1.shape
+            
+# kappa, omegas, tau, eigs
+    if 1:
+        temp1 = []
+        for kapi in range(len(kapvect)):
+            temp2 =[]
+            print 'starting'
+            for wi in range(len(wtlist)):
+                temp3=[]
+                for taui in range(len(tau_list)):
+                
+                    print 'k,w,t',kapi,wi,taui
+                    wplus=[]
+                    wmins=[]
+        
+                    qplus = kapvect[kapi] + tau_list[taui]
+                    qmins = tau_list[taui] - kapvect[kapi]
+        
+                    for eigi in range(len(eig_list[0])):
+                        csectempp = deepcopy(csection)
+                        csectempm = deepcopy(csection)
+                        
+                        nval = sp.S(0.)
+                        for i in range(N_atoms_uc):
+                            nq = sp.Symbol('n%i'%(i,), real = True)
+                            csectempp = csectempp.subs(nq,nval)
+                            csectempm = csectempm.subs(nq,nval)
+                        
+    #                    print 'copy'
+    #                    print csectempp
+    #                    print csectempm
+        
+                        spinmag = sp.Symbol('S', real = True)
+                        kx = sp.Symbol('kx', real = True)
+                        ky = sp.Symbol('ky', real = True)
+                        kz = sp.Symbol('kz', real = True)
+                        
+                        eig_list[0][eigi] = eig_list[0][eigi].subs(spinmag, sp.S(1.0))
+                        eig_list[0][eigi] = eig_list[0][eigi].subs(kx, qplus[0])
+                        eig_list[0][eigi] = eig_list[0][eigi].subs(ky, qplus[1])
+                        eig_list[0][eigi] = eig_list[0][eigi].subs(kz, qplus[2])
+                         #sp.Pow( sp.exp(-np.abs(eig_list[0][eigi])/boltz) - 1 ,-1) #\temperature term taken out
+        
+    #                    print 'kx,ky,kz'
+    #                    print eig_list[0][eigi]
+        
+                        qvalp = kapvect[kapi] - tau_list[taui] - qplus
+                        qvalm = kapvect[kapi] - tau_list[taui] + qmins
+                        wvalp = (eig_list[0][eigi] - wtlist[wi]).evalf()
+                        wvalm = (eig_list[0][eigi] + wtlist[wi]).evalf()
+                        
+        #                csectempp = csectempp.subs(kap - Q - tau, qvalp)
+        #                csectempm = csectempp.subs(kap + Q - tau, qvalm)
+                        csectempp = csectempp.subs(sp.DiracDelta(kap - Q - tau),sp.S(1))
+                        csectempp = csectempp.subs(sp.DiracDelta(kap + Q - tau),sp.S(0))
+                        csectempm = csectempm.subs(sp.DiracDelta(kap - Q - tau),sp.S(0))
+                        csectempm = csectempm.subs(sp.DiracDelta(kap + Q - tau),sp.S(1))
+                        
+    #                    print 'delta(k+q-t)'
+    #                    print csectempp
+    #                    print csectempm
+        
+        #                csectempp = csectempp.subs(sp.DiracDelta(w - wq), sp.DiracDelta(wvalp))
+        #                csectempp = csectempp.subs(sp.DiracDelta(wq + w), sp.DiracDelta(wvalm))
+                        if np.abs(wvalp) < 0.1: 
+                            csectempp = csectempp.subs(sp.DiracDelta(w - wq), sp.S(1))
+                            csectempm = csectempm.subs(sp.DiracDelta(w - wq), sp.S(1))
+                        else:
+                            csectempp = csectempp.subs(sp.DiracDelta(w - wq), sp.S(0))
+                            csectempm = csectempm.subs(sp.DiracDelta(w - wq), sp.S(0))
+                        if np.abs(wvalm) < 0.1:
+                            csectempp = csectempp.subs(sp.DiracDelta(w + wq), sp.S(1))
+                            csectempm = csectempm.subs(sp.DiracDelta(w + wq), sp.S(1)) 
+                        else:
+                            csectempp = csectempp.subs(sp.DiracDelta(w + wq), sp.S(0))
+                            csectempm = csectempm.subs(sp.DiracDelta(wq + w), sp.S(0))                                        
+        #                csectempm = csectempm.subs(sp.DiracDelta(w - wq), sp.DiracDelta(wvalp))
+        #                csectempm = csectempm.subs(sp.DiracDelta(wq + w), sp.DiracDelta(wvalm))            
+        
 
+                        
+    #                    print 'delta(w-wq)'
+    #                    print wvalp
+    #                    print wvalm
+    #                    print csectempp
+    #                    print csectempm
+                        
+                        csectempp = csectempp.subs(kapxhat,kapunit[kapi,0])
+                        csectempp = csectempp.subs(kapyhat,kapunit[kapi,1])
+                        csectempp = csectempp.subs(kapzhat,kapunit[kapi,2])
+                        csectempm = csectempm.subs(kapxhat,kapunit[kapi,0])
+                        csectempm = csectempm.subs(kapyhat,kapunit[kapi,1])
+                        csectempm = csectempm.subs(kapzhat,kapunit[kapi,2])
+                        
+    #                    print 'kap unit vecs'
+    #                    print csectempp
+    #                    print csectempm
+        
+                        wplus.append(csectempp)
+                        wmins.append(csectempm)
+                    
+                    wplus = np.array(wplus)
+                    wmins = np.array(wmins)
+                    wvals = list(wplus + wmins)
+                
+                    temp3.append(wvals)
+                print 'temp3'
+                print temp3
+                temp2.append(np.sum(temp3,axis=0))
+    
+            print temp2
+            temp1.append(temp2)
+        print temp1
+        print len(temp1)
+        temp1 = np.array(temp1)
+        print temp1.shape
+        
+    csdata = temp1
 
-    #print csdata
+#    for tindex in range(len(tau_list)):
+#        temp1=[]
+#        for qindex in range(nqpts):
+#            temp2=[]
+#            for eindex in range(len(eig_list[qindex])):
+#                #temp = eval_it(k,g,i,nkpts,csection)
+#                temp = deepcopy(csection)
+#
+#                for num in range(N_atoms_uc):
+#                    nq = sp.Symbol('n%i'%(num,), real = True)
+#                    #n = sp.Pow( sp.exp(-np.abs(eig_list[k][g][i])/boltz/temperature) - 1 ,-1)
+#                    n=sp.S(0.0)
+#                    temp = temp.subs(nq,n)
+#                    
+#                #if g==0:
+#                if qindex < nkpts:
+#                    value = kapvect[qindex]-tau_list[tindex] - qlist[tindex][qindex]
+#                    if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
+#                        temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
+#                        temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1)) # recall that the delta function is symmetric
+#                    else:
+#                        temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(0))
+#                        temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(0))
+#                    temp = temp.subs(kapxhat,kapunit[qindex,0])
+#                    temp = temp.subs(kapyhat,kapunit[qindex,1])
+#                    temp = temp.subs(kapzhat,kapunit[qindex,2])
+#                #value =kapvect[g//2]- tau_list[k] + qlist[k][g] 
+#                #if g%2!=0:
+#                elif qindex >= nkpts:
+#                    value = kapvect[qindex-nkpts]-tau_list[tindex] - qlist[tindex][qindex]
+#                    if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
+#                        temp = temp.subs(sp.DiracDelta(kap-tau+Q),sp.S(1))
+#                        temp = temp.subs(sp.DiracDelta(-kap+tau-Q),sp.S(1))
+#                    else:
+#                        temp = temp.subs(sp.DiracDelta(kap-tau+Q),sp.S(0))
+#                        temp = temp.subs(sp.DiracDelta(-kap+tau-Q),sp.S(0))
+#                    temp = temp.subs(kapxhat,kapunit[qindex-nkpts,0])
+#                    temp = temp.subs(kapyhat,kapunit[qindex-nkpts,1])
+#                    temp = temp.subs(kapzhat,kapunit[qindex-nkpts,2])                    
+#                value = tau_list[tindex]      
+#                if eq(value[0],0) == 0 and eq(value[1],0) == 0 and eq(value[2],0) == 0:
+#                    temp = temp.subs(sp.DiracDelta(kap-tau-Q),sp.S(1))
+#                    temp = temp.subs(sp.DiracDelta(-kap+tau+Q),sp.S(1)) #
+#                    temp = temp.subs(sp.DiracDelta(kap-tau+Q),sp.S(1))
+#                    temp = temp.subs(sp.DiracDelta(-kap+tau-Q),sp.S(1))
+#                    
+#                #temp = temp.subs(kapxhat,kapunit[g//2,0])
+#                #temp = temp.subs(kapyhat,kapunit[g//2,1])
+#                #temp = temp.subs(kapzhat,kapunit[g//2,2])
+#                
+#                
+#                #value = eig_list[tindex][qindex][eindex] - wtlist[qindex] 
+#                #print '1',temp
+#                temp = temp.subs(wq,eig_list[qindex][eindex])
+#
+#                temp=temp.subs(w,wtlist[qindex])
+#                if 0:
+#                    if eq(value,0) == 0:
+#                        temp = temp.subs(sp.DiracDelta(wq - w), sp.S(1))
+#                    else: 
+#                        temp = temp.subs(sp.DiracDelta(wq - w), sp.S(0))
+#                if 0:
+#                    if eq(eig_list[qindex][eindex], wtlist[qindex]) == 0:
+#                        G=sp.Wild('G', exclude = [Q,kap,tau,w])
+#                        temp=sub_in(temp, sp.DiracDelta(G - A*w), sp.S(1))
+#                    elif eq(eig_list[qindex][eindex], -wtlist[qindex]) == 0:
+#                        G=sp.Wild('G', exclude = [Q,kap,tau,w])
+#                        temp=sub_in(temp, sp.DiracDelta(G - A*w), sp.S(1))
+#                    else:
+#                        temp = temp.subs(w,wtlist[qindex])
+#
+##                print '4',temp
+#                temp2.append(temp)
+#            temp1.append(temp2)
+#        csdata.append(temp1)
+#
+#
+#    #print csdata
 
     # Front constants and stuff for the cross-section
     front_constant = 1.0#(gamr0)**2#/(2*pi*hbar)
     front_func = (1./2.)*g#*F(k)
     debye_waller= 1. #exp(-2*W)
     
-    cstemp=[]
-    for g in range(nqpts):
-        for k in range(len(tau_list)):
-            cstemp.append(csdata[k][g][0].subs(lifetime,sp.S(.1)))
-            
-    print cstemp
-    sys.exit()
+#    cstemp=[]
+#    for g in range(nqpts):
+#        for k in range(len(tau_list)):
+#            cstemp.append(csdata[k][g][0].subs(lifetime,sp.S(.1)))
+#            
+#    print cstemp
+#    sys.exit()
     
-    qtlist=np.array(qlist,'Float64').reshape((nqpts*len(tau_list),3))[:,0]
-    xi=qtlist
+    
+    #qtlist=np.array(qlist,'Float64').reshape((nqpts*len(tau_list),3))[:,0]
+    xi=wtlist
     yi=wtlist
-    zi=np.array(cstemp,'Float64')
+    zi=np.array(csdata,'Float64')
     Z=matplotlib.mlab.griddata(xi,yi,zi,xi,yi)
     zmin, zmax = np.min(Z), np.max(Z)
     locator = ticker.MaxNLocator(10) # if you want no more than 10 contours
@@ -891,10 +1102,10 @@ def run_cross_section(interactionfile, spinfile):
         for i in range(1):
             tau_list.append(np.array([0,0,0], 'Float64'))
 
-        h_list = np.linspace(0.1,12.0,200)
+        h_list = np.linspace(0.1,12.0,50)
         k_list = np.zeros(h_list.shape)
         l_list = np.zeros(h_list.shape)
-        w_list = np.linspace(0.1,10.0,200)
+        w_list = np.linspace(0.1,10.0,50)
 
         efixed = 14.7 #meV
         eief = True
