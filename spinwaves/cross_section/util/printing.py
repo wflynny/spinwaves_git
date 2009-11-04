@@ -107,8 +107,7 @@ class LaTeXDisplayFrame(wx.Frame):
         wx.Frame.__init__(self, parent, -1, title, size=(300,250))
         self.parent = parent
         #self.PID = ID
-        self.input = input_text
-        self.input  ="HI!"
+        self.input = ''+input_text
 
         
         panel = wx.Panel(self,-1)

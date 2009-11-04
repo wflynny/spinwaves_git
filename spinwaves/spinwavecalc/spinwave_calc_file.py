@@ -829,8 +829,8 @@ if __name__=='__main__':
         #interactionfile=r'C:/Documents and Settings/wflynn/My Documents/workspace/spinwaves/spinwaves/spinwavecalc/tests/montecarlo_sc.txt'
         
         #NEED TO CHANGE THESE! SPECIFIC TO BILL"S MACHINE
-        spinfile=r'C:/eig_test_Spins.txt'
-        interactionfile=r'C:/eig_test_montecarlo.txt'
+        spinfile=r'C:/Users/Bill/Documents/Spins.txt.'#'C:/eig_test_Spins.txt'
+        interactionfile=r'C:/Users/Bill/Documents/montecarlo.txt'#'C:/eig_test_montecarlo.txt'
         
         steps=100
         data={}
@@ -840,6 +840,7 @@ if __name__=='__main__':
         direction=data
         Hsave = driver1(spinfile,interactionfile)
         eigs = Hsave.eigenvals().keys()
+        print 'eigs'
         print eigs
         printing.generate_output(eigs)
         driver2(Hsave,direction,steps,0,2*N.pi)

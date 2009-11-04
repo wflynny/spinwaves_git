@@ -656,28 +656,50 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list
                     csectempm = csectempm.subs(sp.DiracDelta(kap - Q - tau),sp.S(0))
                     csectempm = csectempm.subs(sp.DiracDelta(kap + Q - tau),sp.S(1))
 
+                    csectempp = csectempp.subs(kapxhat,kapunit[kapi,0])
+                    csectempp = csectempp.subs(kapyhat,kapunit[kapi,1])
+                    csectempp = csectempp.subs(kapzhat,kapunit[kapi,2])
+                    csectempm = csectempm.subs(kapxhat,kapunit[kapi,0])
+                    csectempm = csectempm.subs(kapyhat,kapunit[kapi,1])
+                    csectempm = csectempm.subs(kapzhat,kapunit[kapi,2])
+
                     for eigi in range(len(eig_list[taui])):
                         
                         eigcsecp=deepcopy(csectempp)
                         eigcsecm=deepcopy(csectempm)
                         
+                        print 'a'
+                        print eigcsecp
+                        print eigcsecm
+                        
+
                         eigtemp = deepcopy(eig_list[0][eigi])
+                        
+                        print 'eig', eigtemp
                         
                         spinmag = sp.Symbol('S', real = True)
                         kx = sp.Symbol('kx', real = True)
                         ky = sp.Symbol('ky', real = True)
                         kz = sp.Symbol('kz', real = True)
                         
-                        #print 'eigtemp a',eigtemp
-                        
+                        print 'kappa'
+                        print kapvect[kapi][0]
+                        print kapvect[kapi][1]
+                        print kapvect[kapi][2]
                         eigtemp = eigtemp.subs(spinmag, sp.S(1.0))
-                        eigtemp = eigtemp.subs(kx, kapvect[kapi][0])
+                        eigtemp = eigtemp.subs(kx, kapvect[kapi][2])
                         eigtemp = eigtemp.subs(ky, kapvect[kapi][1])
                         eigtemp = eigtemp.subs(kz, kapvect[kapi][2])
                          #sp.Pow( sp.exp(-np.abs(eig_list[0][eigi])/boltz) - 1 ,-1) #\temperature term taken out
 
-                        wvalp = (eigtemp - wtlist[wi]).evalf()
-                        wvalm = (eigtemp + wtlist[wi]).evalf()
+                        print 'eig'
+                        print eigtemp
+
+                        wvalp = sp.re((eigtemp - wtlist[wi])).evalf()
+                        wvalm = sp.re((eigtemp + wtlist[wi])).evalf()
+                        print 'w vals'
+                        print wvalp
+                        print wvalm
 
                         if np.abs(wvalp) < 0.1: 
                             eigcsecp = eigcsecp.subs(sp.DiracDelta(w - wq), sp.S(1))
@@ -691,13 +713,10 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list
                         else:
                             eigcsecp = eigcsecp.subs(sp.DiracDelta(w + wq), sp.S(0))
                             eigcsecm = eigcsecm.subs(sp.DiracDelta(wq + w), sp.S(0))                                        
-        
-                        eigcsecp = eigcsecp.subs(kapxhat,kapunit[kapi,0])
-                        eigcsecp = eigcsecp.subs(kapyhat,kapunit[kapi,1])
-                        eigcsecp = eigcsecp.subs(kapzhat,kapunit[kapi,2])
-                        eigcsecm = eigcsecm.subs(kapxhat,kapunit[kapi,0])
-                        eigcsecm = eigcsecm.subs(kapyhat,kapunit[kapi,1])
-                        eigcsecm = eigcsecm.subs(kapzhat,kapunit[kapi,2])
+                        
+                        print 'b'
+                        print eigcsecp
+                        print eigcsecm
         
                         qps.append(eigcsecp)
                         qms.append(eigcsecm)
@@ -708,8 +727,8 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, qlist, tau_list, eig_list
                     #wvals = wplus + wmins
 
                     temp3.append(sum(ws))
-                print 'temp3'
-                print temp3
+#                print 'temp3'
+#                print temp3
                 temp2.append(np.sum(np.array(temp3)))
 
             print temp2
@@ -981,7 +1000,7 @@ def run_cross_section(interactionfile, spinfile):
         h_list = np.zeros(l_list.shape)
         k_list = np.zeros(h_list.shape)
         
-        w_list = np.linspace(-3,0.0,25)
+        w_list = np.linspace(0.,3.,25)
 
         efixed = 14.7 #meV
         eief = True
@@ -1005,8 +1024,8 @@ if __name__=='__main__':
 
 
 
-    interfile = r'C:/eig_test_montecarlo.txt'#'c:/Users/Bill/Documents/montecarlo.txt'
-    spinfile = r'C:/eig_test_Spins.txt'#'c:/Users/Bill/Documents/spins.txt'
+    interfile = r'c:/Users/Bill/Documents/montecarlo.txt'#'C:/eig_test_montecarlo.txt'
+    spinfile = r'c:/Users/Bill/Documents/spins.txt'#'C:/eig_test_Spins.txt'
     
     N_atoms_uc,csection,kaprange,qlist,tau_list,eig_list,kapvect,wtlist = run_cross_section(interfile,spinfile)
 #    left_conn, right_conn = Pipe()
