@@ -334,6 +334,15 @@ def replace_bdb(atom_list, arg):
     print "Applied: bdq*bq Replacement"
     return arg
 
+
+def eq(a,b,tol=2e-1):
+        c = (abs(a-b) < tol)
+        if c:
+            return 0
+        else:
+            if a>b: return abs(a-b)
+            else: return abs(b-a)
+#def eval_cross_section(N, N_uc, atom_list, jmats, cross, qvals, temp, direction, lmin, lmax):
 def generate_cross_section(interactionfile, spinfile, lattice, arg, 
                        tau_list, h_list, k_list, l_list, w_list):
     """
@@ -348,31 +357,52 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     # Read files, get atom_list and such
     atom_list, jnums, jmats,N_atoms_uc=readFiles(interactionfile,spinfile)
     
+
     # Get Hsave to calculate its eigenvalues
     N_atoms = len(atom_list)
     Hsave,poly,heigs = calculate_dispersion(atom_list,N_atoms_uc,N_atoms,jmats,showEigs=True)
     atom_list=atom_list[:N_atoms_uc]
     N_atoms = len(atom_list)
     N = N_atoms
+    
     print "Calculated: Dispersion Relation"
 
+    # Generate kappa's from (h,k,l)
+    #kaprange = []
+    #kapvect = []
+    #if len(h_list) == len(k_list) == len(l_list):
+        #for i in range(len(h_list)):
+            #kappa = lattice.modvec(h_list[i],k_list[i],l_list[i], 'latticestar')
+            #kaprange.append(kappa[0])
+            #kapvect.append(np.array([h_list[i],k_list[i],l_list[i]]))
+##            kapvect.append(np.array([h_list[i]/kappa,k_list[i]/kappa,l_list[i]/kappa]))
+    #else:
+        #raise Exception('h,k,l not same lengths')
+    # Generate q's from kappa and tau
     kaprange=lattice.modvec(h_list,k_list,l_list, 'latticestar')
     nkpts=len(kaprange)
     kapvect=np.empty((nkpts,3),'Float64')
     kapvect[:,0]=h_list
     kapvect[:,1]=k_list
     kapvect[:,2]=l_list
-
+#    print kapvect.shape
+#    print kaprange.shape
     kapunit = kapvect.copy()
     kapunit[:,0]=kapvect[:,0]/kaprange
     kapunit[:,1]=kapvect[:,1]/kaprange
     kapunit[:,2]=kapvect[:,2]/kaprange
-
+    #plusq=kappa-tau
     plusq=[]
     minusq=[]
     qlist=[]
     ones_list=np.ones((1,nkpts),'Float64')
+    #wtlist=np.ones((1,nkpts*2),'Float64').flatten()
+#    wtlist=np.hstack([w_list,w_list])
     wtlist=w_list
+    #weven=np.array(range(0,nkpts*2,2))
+    #wodd=np.array(range(1,nkpts*2,2))
+    #wtlist[wodd]=w_list
+    #wtlist[weven]=w_list    
     qtlist=[]
     
     for tau in tau_list:
@@ -384,25 +414,44 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
         tau_minus_kappa=taui - kapvect
                
         qlist.append(np.vstack([kappa_minus_tau,tau_minus_kappa]))
+    #calculate kfki
+    nqpts=nkpts*2
+    #kfki=calc_kfki(w_list,eief,efixed)
+
 
     eig_list=[]
+#    print qlist
     eigs = Hsave.eigenvals().keys()
     for q in qlist:
+        #eigs = calc_eigs_direct(Hsave,q[:,0],q[:,1],q[:,2])
+        #eigs = Hsave.eigenvals().keys()
+        print eigs
         eig_list.append(eigs)
     eig_list = np.array(eig_list)
     print "Calculated: Eigenvalues"
+    
+    
+ #   print len(qlist)
+ #   print len(eig_list[0])
+#    sys.exit()
 
     # Other Constants
-    kap = sp.Symbol('kappa', real = True)
+    gamr0 = 2*0.2695e-12 #sp.Symbol('gamma', commutative = True)
+    hbar = sp.S(1.0) # 1.05457148*10**(-34) #sp.Symbol('hbar', commutative = True)
+    g = 2.#sp.Symbol('g', commutative = True)
+    # Kappa vector
+    kap = sp.Symbol('kappa', real = True)#spm.Matrix([sp.Symbol('kapx',real = True),sp.Symbol('kapy',real = True),sp.Symbol('kapz',real = True)])
     t = sp.Symbol('t', real = True)
     w = sp.Symbol('w', real = True)
     W = sp.Symbol('W', real = True)
     tau = sp.Symbol('tau', real = True)
     Q = sp.Symbol('q', real = True)
     L = sp.Symbol('L', real = True)
-    lifetime=0.5
+    lifetime=0.5#sp.Symbol('V',real=True)
+    boltz = 8.617343e-2
 
     # Form Factor
+
     ff_list = []
     for i in range(N_atoms_uc):
         el = elements[atom_list[i].atomicNum]
@@ -414,11 +463,13 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
         ff_list = Mq #ff_list.append(Mq)
     print "Calculated: Form Factors"
   
+
     # Wilds for sub_in method
     A = sp.Wild('A',exclude = [0,t])
     B = sp.Wild('B',exclude = [0,t])
     C = sp.Wild('C')
     D = sp.Wild('D')
+    K = sp.Wild('K')
     
     # Grabs the unit vectors from the back of the lists. 
     unit_vect = []
@@ -427,30 +478,38 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     kapzhat = sp.Symbol('kapzhat',real=True)
     for i in range(len(arg)):
         unit_vect.append(arg[i].pop())
+    #print unit_vect
     unit_vect = sum(unit_vect)
+    print unit_vect
     
     csection=0
     for i in range(len(arg)):
         for j in range(len(arg[i])):
             csection = (csection + arg[i][j]*unit_vect)
-                
+            
+    print csection
+    
     for i in range(N):
         ni = sp.Symbol('n%i'%(i,), real = True)
         np1i = sp.Symbol('np1%i'%(i,), Real = True)
         csection.subs(ni+1,np1i)
 
     csection = csection.expand()
-        
+    
+    print csection
+    
     csection = csection.subs(kapxhat*kapyhat,0)
     csection = csection.subs(kapxhat*kapzhat,0)
     csection = csection.subs(kapyhat*kapzhat,0)
     csection = csection.subs(kapzhat*kapyhat,0)
     csection = csection.subs(kapzhat*kapxhat,0)
     csection = csection.subs(kapyhat*kapxhat,0)
-        
+    
+    print csection
+    
     csection = (csection * exp(-I*w*t) * exp(I*kap*L)).expand(deep=False)
     csection = sp.powsimp(csection, deep=True)
-    print 'beginning delta conversion'
+    print 'beginning'
     print csection
     csection = sp.powsimp(csection)
     csection = sub_in(csection,exp(I*t*A + I*t*B + I*C + I*D + I*K),sp.DiracDelta(A*t + B*t + C + D + K))
@@ -458,7 +517,7 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     print csection
 #    csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),(1./hbar)*sp.DiracDelta(A + B)*sp.simplify(sp.DiracDelta(C + D  - tau)))  #This is correct
     csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),sp.Pow(pi,-1)*(lifetime*0.5)*sp.Pow((A+B)**2+(lifetime*0.5)**2,-1)*sp.simplify(sp.DiracDelta(C + D  - tau)))
-    print 'ending  delta conversion'
+    print 'ending'
     print csection
     
 
@@ -487,6 +546,8 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     eief - True => E_initial = efixed, False => E_final = efixed
     efixed - fixed energy; either E_final or E_initial, subject to eief
     """
+    
+    
     print "begin part 2"
 
     # Kappa vector
@@ -495,7 +556,6 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     w = sp.Symbol('w', real = True)
     tau = sp.Symbol('tau', real = True)
     Q = sp.Symbol('q', real = True)
-    L = sp.Symbol('L', real = True)
     wq = sp.Symbol('wq', real = True)
     kapxhat = sp.Symbol('kapxhat',real=True)
     kapyhat = sp.Symbol('kapyhat',real=True)
@@ -527,6 +587,9 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
                 print 'k,w,t',kapi,wi,taui
                 ws=[]
 
+                #qplus = kapvect[kapi] + tau_list[taui]
+                #qmins = tau_list[taui] - kapvect[kapi]
+
                 csectempp = deepcopy(csection)
                 csectempm = deepcopy(csection)                    
 
@@ -537,6 +600,10 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
                 csectempp = csectempp.subs(sp.DiracDelta(kap + Q - tau),sp.S(0))
                 csectempm = csectempm.subs(sp.DiracDelta(kap - Q - tau),sp.S(0))
                 csectempm = csectempm.subs(sp.DiracDelta(kap + Q - tau),sp.S(1))
+#                print 'm'
+#                print csectempm
+#                print 'p'
+#                print csectempp
 
                 csectempp = csectempp.subs(kapxhat,kapunit[kapi,0])
                 csectempp = csectempp.subs(kapyhat,kapunit[kapi,1])
@@ -549,13 +616,23 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
                     eigcsecp=deepcopy(csectempp)
                     eigcsecm=deepcopy(csectempm)
 
+#                    print 'a'
+#                    print eigcsecp
+#                    print eigcsecm
+
                     eigtemp = deepcopy(eig_list[0][eigi])
+
+#                    print 'eig', eigtemp
 
                     spinmag = sp.Symbol('S', real = True)
                     kx = sp.Symbol('kx', real = True)
                     ky = sp.Symbol('ky', real = True)
                     kz = sp.Symbol('kz', real = True)
 
+#                    print 'kappa'
+#                    print kapvect[kapi][0]
+#                    print kapvect[kapi][1]
+#                    print kapvect[kapi][2]
                     eigtemp = eigtemp.subs(spinmag, sp.S(1.0))
                     eigtemp = eigtemp.subs(kx, kapvect[kapi][0])
                     eigtemp = eigtemp.subs(ky, kapvect[kapi][1])
@@ -563,14 +640,29 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
                     eigtemp = sp.abs(eigtemp.evalf(chop=True))
 #                    sp.Pow( sp.exp(-np.abs(eig_list[0][eigi])/boltz) - 1 ,-1) #\temperature term taken out
 
+#                    print 'eig'
+#                    print eigtemp.evalf()
+
+#                    print 'a'
+#                    print eigcsecp
+#                    print eigcsecm
+
+
                     nval = sp.Pow(sp.exp(sp.abs(eigtemp)/(boltz*temperature))-1,-1).evalf()
                     for i in range(N_atoms_uc):
                         nq = sp.Symbol('n%i'%(i,), real = True)
                         eigcsecp = eigcsecp.subs(nq,nval)
                         eigcsecm = eigcsecm.subs(nq,nval) 
 
+#                    print 'b'
+#                    print eigcsecp
+#                    print eigcsecm
+
                     wvalp = eigtemp - wtlist[wi]
                     wvalm = eigtemp + wtlist[wi]
+#                    print 'w vals'
+#                    print wvalp
+#                    print wvalm
 
                     eigcsecp = eigcsecp.subs((w-wq),wvalp)
                     eigcsecp = eigcsecp.subs((w+wq),wvalm)
@@ -591,6 +683,11 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
 #                    else:
 #                        eigcsecp = eigcsecp.subs(sp.DiracDelta(w + wq), sp.S(0))
 #                        eigcsecm = eigcsecm.subs(sp.DiracDelta(wq + w), sp.S(0))                                        
+#
+#                    print 'p'
+#                    print eigcsecp
+#                    print 'm'
+#                    print eigcsecm
 
                     # eief == True => ei=efixed
                     # eief == False => ef=efixed
@@ -604,6 +701,7 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
                         ei = ef + eigtemp
                         kpk = ef/ei
 
+
                     ws.append(kpk*(eigcsecp+eigcsecm))
                 
                 temp3.append(sum(ws))
@@ -615,13 +713,147 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     print csdata.shape
 
     #Multiply data by front constants
-    csdata = front_constant*csdata
+    #csdata = front_constant*csdata
     
     #Multiply by Form Factor
     print fflist.shape
     csdata = fflist*csdata
 
     return kapvect, wtlist, csdata
+
+def eval_single_cross_section(N_atoms_uc, atom_list, theta, phi, rad, csection, kaprange, tau, eig_list, wt,
+                       temperature, eief = True, efixed = 14.7):
+    """
+    N_atoms_uc - number of atoms in unit cell
+    csection - analytic cross-section expression
+    kaprange - kappa modulus
+    kap - kappa vector
+    tau - tau
+    eig_list - list of eigenvalues
+    wt - omega
+    temperature - temperature
+    eief - True => E_initial = efixed, False => E_final = efixed
+    efixed - fixed energy; either E_final or E_initial, subject to eief
+    """
+
+    print "begin part 2"
+
+    kx = rad*np.sin(theta)*np.cos(phi)
+    ky = rad*np.sin(theta)*np.sin(phi)
+    kz = rad*np.cos(theta)
+    kap = np.array([kx,ky,kz])
+    
+    kapmod = np.sqrt(kx*kx+ky*ky+kz*kz)    
+
+    t = sp.Symbol('t', real = True)
+    w = sp.Symbol('w', real = True)
+    Q = sp.Symbol('q', real = True)
+    wq = sp.Symbol('wq', real = True)
+    kapxhat = sp.Symbol('kapxhat',real=True)
+    kapyhat = sp.Symbol('kapyhat',real=True)
+    kapzhat = sp.Symbol('kapzhat',real=True)
+
+    kapunit = kap.copy()
+    kapunit[0]=kap[0]/kapmod
+    kapunit[1]=kap[1]/kapmod
+    kapunit[2]=kap[2]/kapmod    
+
+    # Front constants and stuff for the cross-section
+    boltz = 8.617343e-2
+    gamr0 = 1.913*2.818
+    hbar = 1#6.582*10**-13 
+    g = 2.0
+    temperature = temperature
+
+    debye_waller = 1.0 #exp(-2*W)
+    front_constant = ((gamr0**2)*debye_waller/(2*pi*hbar)).evalf() #(gamr0)**2#/(2*pi*hbar)
+    print front_constant
+
+    ws=[]
+
+    csectempp = deepcopy(csection)
+    csectempm = deepcopy(csection)                    
+
+    csectempp = csectempp.subs(sp.DiracDelta(kap - Q - tau),sp.S(1))
+    csectempp = csectempp.subs(sp.DiracDelta(kap + Q - tau),sp.S(0))
+    csectempm = csectempm.subs(sp.DiracDelta(kap - Q - tau),sp.S(0))
+    csectempm = csectempm.subs(sp.DiracDelta(kap + Q - tau),sp.S(1))
+
+    csectempp = csectempp.subs(kapxhat,kapunit[0])
+    csectempp = csectempp.subs(kapyhat,kapunit[1])
+    csectempp = csectempp.subs(kapzhat,kapunit[2])
+    csectempm = csectempm.subs(kapxhat,kapunit[0])
+    csectempm = csectempm.subs(kapyhat,kapunit[1])
+    csectempm = csectempm.subs(kapzhat,kapunit[2])
+
+    for eigi in range(len(eig_list)):
+        eigcsecp=deepcopy(csectempp)
+        eigcsecm=deepcopy(csectempm)
+
+        eigtemp = deepcopy(eig_list[0][eigi])
+
+        spinmag = sp.Symbol('S', real = True)
+        kx = sp.Symbol('kx', real = True)
+        ky = sp.Symbol('ky', real = True)
+        kz = sp.Symbol('kz', real = True)
+
+        eigtemp = eigtemp.subs(spinmag, sp.S(1.0))
+        eigtemp = eigtemp.subs(kx, kap[0])
+        eigtemp = eigtemp.subs(ky, kap[1])
+        eigtemp = eigtemp.subs(kz, kap[2])
+        eigtemp = sp.abs(eigtemp.evalf(chop=True))
+
+        nval = sp.Pow(sp.exp(sp.abs(eigtemp)/(boltz*temperature))-1,-1).evalf()
+        for i in range(N_atoms_uc):
+            nq = sp.Symbol('n%i'%(i,), real = True)
+            eigcsecp = eigcsecp.subs(nq,nval)
+            eigcsecm = eigcsecm.subs(nq,nval) 
+
+        wvalp = eigtemp - wt
+        wvalm = eigtemp + wt
+
+        eigcsecp = eigcsecp.subs((w-wq),wvalp)
+        eigcsecp = eigcsecp.subs((w+wq),wvalm)
+        eigcsecp = sp.re(eigcsecp.evalf(chop = True))
+        eigcsecm = eigcsecm.subs((w-wq),wvalp)
+        eigcsecm = eigcsecm.subs((w+wq),wvalm)
+        eigcsecm = sp.re(eigcsecm.evalf(chop = True))
+
+        # eief == True => ei=efixed
+        # eief == False => ef=efixed
+        kpk = 0.
+        if eief == True:
+            ei = efixed
+            ef = ei - eigtemp
+            kpk = ef/ei
+        else:
+            ef = efixed
+            ei = ef + eigtemp
+            kpk = ef/ei
+
+        ws.append(kpk*(eigcsecp+eigcsecm))
+    
+    csdata = sp.re(sum(ws))
+
+    #Multiply data by front constants
+    #csdata = front_constant*csdata
+
+    # Form Factor
+
+    ff = 0
+    for i in range(N_atoms_uc):
+        el = elements[atom_list[i].atomicNum]
+        val = atom_list[i].valence
+        if val != None:
+            Mq = el.magnetic_ff[val].M_Q(N_atoms_uc)
+        else:
+            Mq = el.magnetic_ff[0].M_Q(N_atoms_uc)
+        ff = Mq #ff_list.append(Mq)
+
+    #Multiply by Form Factor
+    csdata = fflist*csdata
+
+    return csdata
 
 def plot_cross_section(xi, wtlist, csdata):
     xi = xi # kapvect[:,0]
@@ -729,5 +961,6 @@ if __name__=='__main__':
 #    p.join()
 #    p.terminate()
 
-    kapvect,wtlist,csdata=run_eval_cross_section(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wtlist,fflist)
-    plot_cross_section(kapvect[:,0],wtlist,csdata)
+    #kapvect,wtlist,csdata=run_eval_cross_section(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wtlist,fflist)
+    #plot_cross_section(kapvect[:,0],wtlist,csdata)
+    

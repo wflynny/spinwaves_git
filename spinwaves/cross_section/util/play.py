@@ -3,8 +3,9 @@ matplotlib.use('WXAgg')
 import pylab
 from matplotlib._pylab_helpers import Gcf
 import sympy as sp
-from sympy import oo,I,cos,sin,exp
+#from sympy import oo,I,cos,sin,exp
 import numpy as np
+from numpy import sin, cos, exp, pi
 import scipy as sci
 from scipy.integrate import quad, inf
 from scipy.sparse import bsr_matrix
@@ -14,12 +15,41 @@ import periodictable
 from periodictable import elements
 from spinwaves.spinwavecalc.readfiles import atom
 from numpy.random import uniform
-from util.printing import *
+from printing import *
 from multiprocessing import Process, Lock
 import matplotlib.pyplot as plt
 import spinwaves.spinwavecalc.readfiles as rf
+from scipy.integrate import dblquad
 
 if 1:
+    res, err = dblquad(lambda y,x: sin(x), 0, pi, lambda x: 0, lambda x: 2*pi)
+    print res/4.0/pi
+
+if 0:
+    def func2d(theta,phi):
+        q = 1
+        qx=q*sin(theta)*cos(phi)
+        qy=q*sin(theta)*sin(phi)
+        qz=q*cos(theta)
+        
+        func = q**2 * sin(theta) * 1.0
+        
+        return func/(4*pi)
+
+    phiL = 0
+    phiU = 2*pi
+    def thetaL(phi):
+        return lambda phi: 0
+    def thetaU(phi):
+        return lambda phi: np.pi
+
+    def driver(func2d, phiL, phiU, thetaL, thetaU):
+        return dblquad(func2d, phiL, phiU, thetaL, thetaU)
+        
+    print driver(func2d, phiL, phiU, thetaL, thetaU)
+
+
+if 0:
     a = [1,2,3,4,5,6,7]
     b = [1,2,5]
     comms = [a[i] in b for i in range(len(a))]
@@ -303,10 +333,11 @@ if 0:
     print at1.atomicNum
     el = elements[at1.atomicNum]
     print el
-    Q=np.arange(0.,1.,1./100.)
+    Q=np.linspace(0.,1.,100.)
     print Q
     Mq = el.magnetic_ff[at1.valence].M_Q(Q)
     print type(Mq)
+    print Mq
     print type(Q)
     pylab.plot(Q,Mq)
     pylab.show()
