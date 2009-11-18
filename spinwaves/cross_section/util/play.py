@@ -23,8 +23,8 @@ from scipy.integrate import dblquad
 
 if 1:
     def func(y,x,args):
-        return sin(x)
-    res, err = dblquad(func, 0, pi, lambda x: 0, lambda x: 2*pi)
+        return y*sin(x)
+    res, err = dblquad(func, 0, pi, lambda x: 0, lambda x: 2*pi, args=(1.0,))
     print res/4.0/pi
 
 if 0:
