@@ -4,6 +4,7 @@ import sys
 import sympy as sp
 import numpy as np
 import sympy.matrices as spm
+from scipy.integrate import dblquad
 from sympy import I,pi,var,exp,oo,sqrt
 from sympy.physics.paulialgebra import delta
 from sympy.core.cache import *
@@ -717,7 +718,7 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     
     #Multiply by Form Factor
     print fflist.shape
-    csdata = fflist*csdata
+    csdata = g*fflist*csdata
 
     return kapvect, wtlist, csdata
 
@@ -743,7 +744,7 @@ def eval_single_cross_section(N_atoms_uc, atom_list, theta, phi, rad, csection, 
     kz = rad*np.cos(theta)
     kap = np.array([kx,ky,kz])
     
-    kapmod = np.sqrt(kx*kx+ky*ky+kz*kz)    
+    kapmod = np.sqrt(kx*kx+ky*ky+kz*kz)
 
     t = sp.Symbol('t', real = True)
     w = sp.Symbol('w', real = True)
@@ -852,8 +853,158 @@ def eval_single_cross_section(N_atoms_uc, atom_list, theta, phi, rad, csection, 
 
     #Multiply by Form Factor
     csdata = fflist*csdata
+    
+    result = integrate_over_sphere(csdata)
 
-    return csdata
+    return result
+
+def spherical_averaging(N_atoms_uc, atom_list, rad, csection, kaprange, tau, eig_list, wt,
+                       temperature, eief = True, efixed = 14.7):
+    """
+    N_atoms_uc - number of atoms in unit cell
+    csection - analytic cross-section expression
+    kaprange - kappa modulus
+    kap - kappa vector
+    tau - tau
+    eig_list - list of eigenvalues
+    wt - omega
+    temperature - temperature
+    eief - True => E_initial = efixed, False => E_final = efixed
+    efixed - fixed energy; either E_final or E_initial, subject to eief
+    """
+
+
+    # theta = y, phi = x
+    # y comes first (i.e. f(y,x,(args))
+    def cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, kaprange, tau, eig_list, wt,
+                       temperature, eief = True, efixed = 14.7):
+
+        # Front constants and stuff for the cross-section
+        boltz = 8.617343e-2
+        gamr0 = 1.913*2.818
+        hbar = 1#6.582*10**-13 
+        g = 2.0
+        temperature = temperature
+    
+        w = sp.Symbol('w', real = True)
+        Q = sp.Symbol('q', real = True)
+        wq = sp.Symbol('wq', real = True)
+        kapxhat = sp.Symbol('kapxhat',real=True)
+        kapyhat = sp.Symbol('kapyhat',real=True)
+        kapzhat = sp.Symbol('kapzhat',real=True)
+        
+        debye_waller = 1.0 #exp(-2*W)
+        front_constant = ((gamr0**2)*debye_waller/(2*pi*hbar)).evalf() #(gamr0)**2#/(2*pi*hbar)
+        print front_constant
+    
+        spinmag = sp.Symbol('S', real = True)
+        kx = sp.Symbol('kx', real = True)
+        ky = sp.Symbol('ky', real = True)
+        kz = sp.Symbol('kz', real = True)
+
+
+        kx = rad*np.sin(theta)*np.cos(phi)
+        ky = rad*np.sin(theta)*np.sin(phi)
+        kz = rad*np.cos(theta)
+        kap = np.array([kx,ky,kz])
+        
+        kapmod = np.sqrt(kx*kx+ky*ky+kz*kz)
+    
+        kapunit = kap.copy()
+        kapunit[0]=kap[0]/kapmod
+        kapunit[1]=kap[1]/kapmod
+        kapunit[2]=kap[2]/kapmod    
+    
+        ws=[]
+    
+        csectempp = deepcopy(csection)
+        csectempm = deepcopy(csection)                    
+    
+        csectempp = csectempp.subs(sp.DiracDelta(kap - Q - tau),sp.S(1))
+        csectempp = csectempp.subs(sp.DiracDelta(kap + Q - tau),sp.S(0))
+        csectempm = csectempm.subs(sp.DiracDelta(kap - Q - tau),sp.S(0))
+        csectempm = csectempm.subs(sp.DiracDelta(kap + Q - tau),sp.S(1))
+    
+        csectempp = csectempp.subs(kapxhat,kapunit[0])
+        csectempp = csectempp.subs(kapyhat,kapunit[1])
+        csectempp = csectempp.subs(kapzhat,kapunit[2])
+        csectempm = csectempm.subs(kapxhat,kapunit[0])
+        csectempm = csectempm.subs(kapyhat,kapunit[1])
+        csectempm = csectempm.subs(kapzhat,kapunit[2])
+    
+        for eigi in range(len(eig_list)):
+            eigcsecp=deepcopy(csectempp)
+            eigcsecm=deepcopy(csectempm)
+    
+            eigtemp = deepcopy(eig_list[0][eigi])
+    
+            eigtemp = eigtemp.subs(spinmag, sp.S(1.0))
+            eigtemp = eigtemp.subs(kx, kap[0])
+            eigtemp = eigtemp.subs(ky, kap[1])
+            eigtemp = eigtemp.subs(kz, kap[2])
+            eigtemp = sp.abs(eigtemp.evalf(chop=True))
+    
+            nval = sp.Pow(sp.exp(sp.abs(eigtemp)/(boltz*temperature))-1,-1).evalf()
+            for i in range(N_atoms_uc):
+                nq = sp.Symbol('n%i'%(i,), real = True)
+                eigcsecp = eigcsecp.subs(nq,nval)
+                eigcsecm = eigcsecm.subs(nq,nval) 
+    
+            wvalp = eigtemp - wt
+            wvalm = eigtemp + wt
+    
+            eigcsecp = eigcsecp.subs((w-wq),wvalp)
+            eigcsecp = eigcsecp.subs((w+wq),wvalm)
+            eigcsecp = sp.re(eigcsecp.evalf(chop = True))
+            eigcsecm = eigcsecm.subs((w-wq),wvalp)
+            eigcsecm = eigcsecm.subs((w+wq),wvalm)
+            eigcsecm = sp.re(eigcsecm.evalf(chop = True))
+    
+            # eief == True => ei=efixed
+            # eief == False => ef=efixed
+            kpk = 0.
+            if eief == True:
+                ei = efixed
+                ef = ei - eigtemp
+                kpk = ef/ei
+            else:
+                ef = efixed
+                ei = ef + eigtemp
+                kpk = ef/ei
+    
+            ws.append(kpk*(eigcsecp+eigcsecm))
+        
+        csdata = sp.re(sum(ws))
+    
+        #Multiply data by front constants
+        #csdata = front_constant*csdata
+    
+        # Form Factor
+    
+        ff = 0
+        for i in range(N_atoms_uc):
+            el = elements[atom_list[i].atomicNum]
+            val = atom_list[i].valence
+            if val != None:
+                Mq = el.magnetic_ff[val].M_Q(N_atoms_uc)
+            else:
+                Mq = el.magnetic_ff[0].M_Q(N_atoms_uc)
+            ff = Mq #ff_list.append(Mq)
+    
+        #Multiply by Form Factor
+        csdata = g*ff*csdata
+        
+        return csdata*np.sin(theta)*rad**2
+
+    plimL = 0.0 
+    plimU = 2*np.pi
+    tlimL = lambda x: 0.0
+    tlimU = lambda x: np.pi
+    
+    return dblquad(cross_section_calc, plimL, plimU, tlimL, tlimU, 
+                   args=(rad, N_atoms_uc, atom_list, csection, kaprange, 
+                         tau, eig_list, wt, temperature, eief, efixed))
+
 
 def plot_cross_section(xi, wtlist, csdata):
     xi = xi # kapvect[:,0]
