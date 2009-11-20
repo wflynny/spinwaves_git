@@ -22,9 +22,11 @@ import spinwaves.spinwavecalc.readfiles as rf
 from scipy.integrate import dblquad
 
 if 1:
-    def func(y,x,args):
-        return y*sin(x)
-    res, err = dblquad(func, 0, pi, lambda x: 0, lambda x: 2*pi, args=(1.0,))
+    def func(y,x,factor,stuff=1):
+        for j in range(100):
+            z=x**2+y**2-x*y
+        return y*sin(x)*factor
+    res, err = dblquad(func, 0, pi, lambda x: 0, lambda x: 2*pi, args=(100,))
     print res/4.0/pi
 
 if 0:

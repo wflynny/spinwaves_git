@@ -133,12 +133,6 @@ def generate_Sx_Sy_Sz_operators(atom_list, Sa, Sb, Sn):
 # Generate Hamiltonian
 def generate_Hamiltonian(atom_list, b_list, bd_list):
     """Generates the Hamiltonian operator"""
-    # Ham = Ham0 + sum over q of hbar*omega_q * bdq * bq
-    # Ham0 = - S^2 N sum over rho of J(rho)
-    # hbar * omega_q = 2 S {cJ(0)-cJ(q)}
-    # sum over rho of J(rho) = Sum J(l-lp) from lp 0 to N l fixed
-    # cJ(0) = sum over rho of J(rho)
-    # cJ(q) = cJ(0)*exp(I*q*(l-lp))
     N = len(atom_list)
     S = sp.Symbol('S', commutative = True)
 
@@ -343,7 +337,7 @@ def eq(a,b,tol=2e-1):
         else:
             if a>b: return abs(a-b)
             else: return abs(b-a)
-#def eval_cross_section(N, N_uc, atom_list, jmats, cross, qvals, temp, direction, lmin, lmax):
+
 def generate_cross_section(interactionfile, spinfile, lattice, arg, 
                        tau_list, h_list, k_list, l_list, w_list):
     """
@@ -357,7 +351,6 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
 
     # Read files, get atom_list and such
     atom_list, jnums, jmats,N_atoms_uc=readFiles(interactionfile,spinfile)
-    
 
     # Get Hsave to calculate its eigenvalues
     N_atoms = len(atom_list)
@@ -368,43 +361,33 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     
     print "Calculated: Dispersion Relation"
 
-    # Generate kappa's from (h,k,l)
-    #kaprange = []
-    #kapvect = []
-    #if len(h_list) == len(k_list) == len(l_list):
-        #for i in range(len(h_list)):
-            #kappa = lattice.modvec(h_list[i],k_list[i],l_list[i], 'latticestar')
-            #kaprange.append(kappa[0])
-            #kapvect.append(np.array([h_list[i],k_list[i],l_list[i]]))
-##            kapvect.append(np.array([h_list[i]/kappa,k_list[i]/kappa,l_list[i]/kappa]))
-    #else:
-        #raise Exception('h,k,l not same lengths')
-    # Generate q's from kappa and tau
+    # Generate kappas from (h,k,l)
     kaprange=lattice.modvec(h_list,k_list,l_list, 'latticestar')
     nkpts=len(kaprange)
     kapvect=np.empty((nkpts,3),'Float64')
     kapvect[:,0]=h_list
     kapvect[:,1]=k_list
     kapvect[:,2]=l_list
-#    print kapvect.shape
-#    print kaprange.shape
+
+    # Grabs the unit vectors from the back of the lists. 
     kapunit = kapvect.copy()
     kapunit[:,0]=kapvect[:,0]/kaprange
     kapunit[:,1]=kapvect[:,1]/kaprange
     kapunit[:,2]=kapvect[:,2]/kaprange
-    #plusq=kappa-tau
-    plusq=[]
-    minusq=[]
+
+    unit_vect = []
+    kapxhat = sp.Symbol('kapxhat',real=True)
+    kapyhat = sp.Symbol('kapyhat',real=True)
+    kapzhat = sp.Symbol('kapzhat',real=True)
+    for i in range(len(arg)):
+        unit_vect.append(arg[i].pop())
+    #print unit_vect
+    unit_vect = sum(unit_vect)
+    print unit_vect
+
+    # Generate qs from kappas and taus
     qlist=[]
     ones_list=np.ones((1,nkpts),'Float64')
-    #wtlist=np.ones((1,nkpts*2),'Float64').flatten()
-#    wtlist=np.hstack([w_list,w_list])
-    wtlist=w_list
-    #weven=np.array(range(0,nkpts*2,2))
-    #wodd=np.array(range(1,nkpts*2,2))
-    #wtlist[wodd]=w_list
-    #wtlist[weven]=w_list    
-    qtlist=[]
     
     for tau in tau_list:
         taui=np.ones((nkpts,3),'Float64')
@@ -415,44 +398,19 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
         tau_minus_kappa=taui - kapvect
                
         qlist.append(np.vstack([kappa_minus_tau,tau_minus_kappa]))
-    #calculate kfki
-    nqpts=nkpts*2
-    #kfki=calc_kfki(w_list,eief,efixed)
 
-
+    # Eigenvalues and omegas
+    wtlist=w_list
     eig_list=[]
-#    print qlist
+
     eigs = Hsave.eigenvals().keys()
     for q in qlist:
-        #eigs = calc_eigs_direct(Hsave,q[:,0],q[:,1],q[:,2])
-        #eigs = Hsave.eigenvals().keys()
         print eigs
         eig_list.append(eigs)
     eig_list = np.array(eig_list)
     print "Calculated: Eigenvalues"
-    
-    
- #   print len(qlist)
- #   print len(eig_list[0])
-#    sys.exit()
-
-    # Other Constants
-    gamr0 = 2*0.2695e-12 #sp.Symbol('gamma', commutative = True)
-    hbar = sp.S(1.0) # 1.05457148*10**(-34) #sp.Symbol('hbar', commutative = True)
-    g = 2.#sp.Symbol('g', commutative = True)
-    # Kappa vector
-    kap = sp.Symbol('kappa', real = True)#spm.Matrix([sp.Symbol('kapx',real = True),sp.Symbol('kapy',real = True),sp.Symbol('kapz',real = True)])
-    t = sp.Symbol('t', real = True)
-    w = sp.Symbol('w', real = True)
-    W = sp.Symbol('W', real = True)
-    tau = sp.Symbol('tau', real = True)
-    Q = sp.Symbol('q', real = True)
-    L = sp.Symbol('L', real = True)
-    lifetime=0.5#sp.Symbol('V',real=True)
-    boltz = 8.617343e-2
 
     # Form Factor
-
     ff_list = []
     for i in range(N_atoms_uc):
         el = elements[atom_list[i].atomicNum]
@@ -463,7 +421,20 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
             Mq = el.magnetic_ff[0].M_Q(kaprange)
         ff_list = Mq #ff_list.append(Mq)
     print "Calculated: Form Factors"
-  
+
+    # Other Constants
+    gamr0 = 2*0.2695e-12 #sp.Symbol('gamma', commutative = True)
+    hbar = sp.S(1.0) # 1.05457148*10**(-34) #sp.Symbol('hbar', commutative = True)
+    g = 2.#sp.Symbol('g', commutative = True)
+    kap = sp.Symbol('kappa', real = True)#spm.Matrix([sp.Symbol('kapx',real = True),sp.Symbol('kapy',real = True),sp.Symbol('kapz',real = True)])
+    t = sp.Symbol('t', real = True)
+    w = sp.Symbol('w', real = True)
+    W = sp.Symbol('W', real = True)
+    tau = sp.Symbol('tau', real = True)
+    Q = sp.Symbol('q', real = True)
+    L = sp.Symbol('L', real = True)
+    lifetime=0.5#sp.Symbol('V',real=True)
+    boltz = 8.617343e-2
 
     # Wilds for sub_in method
     A = sp.Wild('A',exclude = [0,t])
@@ -472,42 +443,26 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     D = sp.Wild('D')
     K = sp.Wild('K')
     
-    # Grabs the unit vectors from the back of the lists. 
-    unit_vect = []
-    kapxhat = sp.Symbol('kapxhat',real=True)
-    kapyhat = sp.Symbol('kapyhat',real=True)
-    kapzhat = sp.Symbol('kapzhat',real=True)
-    for i in range(len(arg)):
-        unit_vect.append(arg[i].pop())
-    #print unit_vect
-    unit_vect = sum(unit_vect)
-    print unit_vect
-    
+    # Generate most general form of csection
     csection=0
     for i in range(len(arg)):
         for j in range(len(arg[i])):
             csection = (csection + arg[i][j]*unit_vect)
-            
-    print csection
-    
+                
     for i in range(N):
         ni = sp.Symbol('n%i'%(i,), real = True)
         np1i = sp.Symbol('np1%i'%(i,), Real = True)
         csection.subs(ni+1,np1i)
 
     csection = csection.expand()
-    
-    print csection
-    
+        
     csection = csection.subs(kapxhat*kapyhat,0)
     csection = csection.subs(kapxhat*kapzhat,0)
     csection = csection.subs(kapyhat*kapzhat,0)
     csection = csection.subs(kapzhat*kapyhat,0)
     csection = csection.subs(kapzhat*kapxhat,0)
     csection = csection.subs(kapyhat*kapxhat,0)
-    
-    print csection
-    
+        
     csection = (csection * exp(-I*w*t) * exp(I*kap*L)).expand(deep=False)
     csection = sp.powsimp(csection, deep=True)
     print 'beginning'
@@ -521,15 +476,14 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     print 'ending'
     print csection
     
-
+    # Do some associative clean up to make it easier for later substitutions
     csection = sub_in(csection,sp.DiracDelta(-A - B),sp.DiracDelta(A + B))
     csection = sub_in(csection,(-A - B)**2,(A + B)**2)
     csection = csection.subs(sp.DiracDelta(Q+tau-kap),sp.DiracDelta(kap-Q-tau))
     csection = csection.subs(sp.DiracDelta(tau-kap-Q),sp.DiracDelta(kap+Q-tau))
     print "Applied: Delta Function Conversion"
 
-    print "end part 1"
-    #print csection
+    print "Generated: Analytic Cross-Section Expression"
     return (N_atoms_uc, csection, kaprange, tau_list, eig_list, kapvect, wtlist, ff_list)
     
 def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapvect, wtlist,
@@ -548,8 +502,7 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     efixed - fixed energy; either E_final or E_initial, subject to eief
     """
     
-    
-    print "begin part 2"
+    print "Begin Numerical Evaluation of Cross-Section"
 
     # Kappa vector
     kap = sp.Symbol('kappa', real = True)
@@ -570,7 +523,7 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     # Front constants and stuff for the cross-section
     boltz = 8.617343e-2
     gamr0 = 1.913*2.818
-    hbar = 1#6.582*10**-13 
+    hbar = 1#6.582e-13 
     g = 2.0
     temperature = temperature
 
@@ -748,7 +701,7 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     ky = rad*np.sin(theta)*np.sin(phi)
     kz = rad*np.cos(theta)
     kap = np.array([kx,ky,kz])
- 
+     
     kapmod = np.sqrt(kx*kx+ky*ky+kz*kz)
 
     kapunit = kap.copy()
@@ -805,10 +758,6 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
         eigcsecm = eigcsecm.subs((w_sym - wq_sym),wvalp)
         eigcsecm = eigcsecm.subs((w_sym + wq_sym),wvalm)
         eigcsecm = sp.re(eigcsecm.evalf(chop = True))
-        
-#            print 'eigs'
-#            print eigcsecp
-#            print eigcsecm
 
         # eief == True => ei=efixed
         # eief == False => ef=efixed
@@ -843,6 +792,7 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     #Multiply by Form Factor
     csdata = g*ff*csdata
     
+    print kx,'\t\t',ky,'\t\t',kz,'\t\t',csdata
     return csdata#*np.sin(theta)*rad**2
 
 
@@ -863,26 +813,30 @@ def spherical_averaging(N_atoms_uc, atom_list, rad, csection, tau, eig_list, wt,
     """
     i think the problem stems from the fact that the cross-section looks
     to be well-behaved when we scan through a single line in kx,ky,kz space. 
-    however, it may not be so well behaved everywhere inside the sphere, specifically
-    at the origin where i assume things blow up. what if we limit this to move
-    along one place or even one line.
+    however, it may not be so well behaved everywhere on the sphere; i believe 
+    things blow up at the origin and this might have some effect on what we want.
+    limiting the integration to one geodesic doesn't seem to help.
     """
 
-    plimL = 0.0 
-    plimU = 2*np.pi
-    tlimL = lambda phi: np.pi/2.0
-    tlimU = lambda phi: np.pi/2.0
+    plimL = 0.0#0.01
+    plimU = np.pi/2.0#2*np.pi
+    tlimL = lambda phi: 0.0#0.01
+    tlimU = lambda phi: np.pi/2.0#np.pi
 
     args=(rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt, temperature, eief, efixed)
 
     # theta = y, phi = x
     # y comes first (i.e. f(y,x,(args))
-    #*np.sin(theta)*rad**2
-    func = lambda t,p: np.sin(t)*rad**2*single_cross_section_calc(t,p,*args)
+    def func(t,p,*args):
+        return np.sin(t)*rad**2*single_cross_section_calc(*args)
+
+    theta_test=np.pi/2.0
+    phi_test = np.pi/4.0
 
     print 'integrating'
+    #res,err =  dblquad(func, plimL, plimU, tlimL, tlimU, args=args)
     res,err =  dblquad(single_cross_section_calc, plimL, plimU, tlimL, tlimU, args=args)
-    #res = cross_section_calc(theta,phi,rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt, temperature, eief, efixed)
+    #res = single_cross_section_calc(theta_test,phi_test,rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt, temperature, eief, efixed)
     print 'done integrating'
     return res
 
@@ -898,9 +852,10 @@ def plot_cross_section(xi, wtlist, csdata):
         locator.set_bounds(zmin, zmax)
         levs = locator()
         levs[0]=1.0
+        plt.contourf(xi,yi,zi, levs)
+    else: plt.contourf(xi,yi,zi)
     #print zmin, zmax
-    plt.contourf(xi,yi,zi, levs)
-  
+    
     l_f = ticker.LogFormatter(10, labelOnlyBase=False)
     cbar = plt.colorbar(ticks = levs, format = l_f)
 
@@ -977,6 +932,10 @@ def run_eval_cross_section(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvec
 
 
 if __name__=='__main__':
+
+    print np.sin(0.256337494949)*np.cos(1.56760261246)
+    print np.sin(0.256337494949)*np.sin(1.56760261246)
+    print np.cos(0.256337494949)
 
     interfile = r'c:/montecarlo.txt'#'c:/Users/Bill/Documents/montecarlo.txt'#'C:/eig_test_montecarlo.txt'
     spinfile = r'c:/spins.txt'#'c:/Users/Bill/Documents/spins.txt'#'C:/eig_test_Spins.txt'
