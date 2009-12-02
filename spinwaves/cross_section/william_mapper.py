@@ -1,0 +1,433 @@
+
+'''
+This module is developed by University of Maryland as part of the Distributed
+Data Analysis of Neutron Scattering Experiments (DANSE) project funded by the
+US National Science Foundation.
+
+Please read license.txt for module usage
+
+copyright 2009, University of Maryland for the DANSE project
+
+
+A Mapper is consists of a set of worker processes for performing Parallel map
+requests. Mapper provides a way to submit jobs (map requests), and get the
+results back when they are available. The Mapper is responsible for assigning
+jobs to the worker processes by putting them in a input queue, where they are
+picked up by the next available worker. The worker then performs the assigned 
+map request in the background and puts the processed request in an output queue.
+
+Currently Mapper uses Python Multiprocessing 'Process' module as worker
+'''
+
+try:
+    import multiprocessing
+except ImportError:
+    print ' Multiprocessing is not available'
+
+# Misc. imports
+import sys
+import Queue
+import time
+import logging
+import traceback
+
+import park
+
+# set-up logging
+logger = logging.getLogger('Mapper')
+park.setup_logger(logger=logger, stderr=False)
+
+# Item pushed on the input queue to tell the worker process to terminate
+SENTINEL = "QUIT"
+
+
+def is_sentinel(obj):
+    """
+    Predicate to determine whether an item from the queue is the signal to stop.
+    """
+    return type(obj) is str and obj == SENTINEL
+
+class Mapper(object):
+    """
+    Mapper class, distributes map requests and collectes them after they are
+    processed. It used Python's built-in 'map' like style and evalutes function 
+    on each elements of an iterable.
+    """
+
+    def __init__(self,  num_workers=0,input_queue_size=0, output_queue_size=0):
+        """
+        Set up the mapper and start num_workers worker processes.
+
+        *num_workers* The number of worker processes to start initially.
+
+        .. note::
+            Currently defualt num_workers is total number of avialble CPUs.
+
+        *input_queue_size* If a positive integer, it's the maximum number of
+         unassigned jobs. The mapper blocks when the queue is full and a new job
+         is submitted.
+        *output_queue_size* If a positive integer, it's the maximum number of
+         completed jobs waiting to be fetched. The mapper blocks when the queue
+         is full and a job is completed.
+        """
+
+        self.closed = False
+        self.workers = []
+        self.activekey2job = {}
+        self.unassignkey2job = {}
+        self.unassigned_jobs = multiprocessing.Queue(input_queue_size)
+        self.processed_jobs = multiprocessing.Queue(output_queue_size)
+        self.num_workers = multiprocessing.cpu_count()
+        self.add_workers(self.num_workers)
+        self.outlist = []
+        
+    def map(self, f, v):
+        """
+        A parallel equivalent of Python's built-in 'map()' function. It blocks 
+        till the result is ready.
+
+        *f* name of the function
+        *v* iterable
+        """
+        print '4'
+        self.func = f
+        self.data = v
+        argindex = 0
+        self.outlist = [None] 
+        exit_loop = False
+        chunk = []
+        
+        print '5'
+        
+        seq = []
+        for i in xrange(1):
+            job = Map_job(self.func, argindex, self.data)
+            argindex += 1
+            seq.append(job)
+            
+        print '6'
+                
+        chunk.append(Map_chunk(seq))
+        print '8'
+        for seq in chunk:
+            self.add_mapjob(seq)
+            
+        print '9'
+        result = self.collect_work()
+        print '7'
+        return result
+    
+    def add_workers(self, n):
+        """
+        Add worker processes to the pool.
+        """
+        for _ in xrange(n):
+            self.workers.append(Worker(self.unassigned_jobs, self.processed_jobs))
+                               
+    def add_mapjob(self, job):
+        """
+        Add a map-request to the end of input queue.
+        
+        *timeout* If the input queue is full and timeout is None, block until a
+        slot becomes avilable. If timeout >0, block for uptp timeout seconds and
+        raise Queue.Full exception if the queue is still full. If timeout <=0, 
+        do not block and raise Queue.Full immediately if the queue is full.
+        """
+        key = job.key
+        self.unassigned_jobs.put(job)
+        self.unassignkey2job[key] = self.activekey2job[key] = job
+              
+    def submit_work(self, func, iterable, chunksize=None):
+        """
+        This method chops the iterable into a number of chunks which
+        it submits to the process pool as separate map_jobs. The (approximate)
+        size of these chunks can be specified by setting chunksize to a positive
+        integer. For very long iterables using a large value for chunksize can
+        make make the job complete much faster than using the default value of 1.
+        """
+        self.func = func
+        self.iterable = iterable
+        
+        chunksize, extra = divmod(len(self.iterable), len(self.workers)*4)
+        if extra:
+            chunksize += 1
+        argindex = 0
+        self.outlist = [None] * len(self.iterable)
+        iter_element = iter(self.iterable)
+        exit_loop = False
+        chunk = []
+        
+        while not exit_loop:
+            seq = []
+            for i in xrange(chunksize or 1):
+                try:
+                    arg = iter_element.next()
+                    
+                except StopIteration:
+                    exit_loop = True
+                    break
+                job = Map_job(self.func, argindex, (self.iterable[argindex],))
+                argindex += 1
+                seq.append(job)
+                
+            chunk.append(Map_chunk(seq))
+
+        for seq in chunk:
+            self.add_mapjob(seq)
+
+    def iter_processed_jobs(self):
+        # Returns an iterator over the finished mapjobs, popping them off from 
+        # the processed_jobs queue                
+       
+        while self.activekey2job:
+            print '15'
+            try:
+                print '16'
+                job = self.processed_jobs.get()
+                
+            except Queue.Empty:
+                print '17'
+                logger.debug('queue empty')
+                
+                break
+            key = job.key
+            
+            # at this point the key is guaranteed to be in activekey2job even
+            # if the job has been cancelled
+            assert key in self.activekey2job
+            del self.activekey2job[key]
+            yield job
+
+    def collect_work(self):
+        # Return a list of finished mapjob requests.
+        try:
+            while len(self.outlist)>=0:
+                print '11'
+                res = self.iter_processed_jobs().next()
+                print '14'
+                result = res.result()
+                print '12'
+                for i in result:
+                    print '13'
+                    returnindex =  i[0]
+                    value = i[1]
+                    self.outlist[returnindex] = value  
+                                                           
+        except StopIteration:
+            pass
+        
+        print '10'
+        return self.outlist
+
+    def num_of_worker(self):
+        return len(self.workers)
+
+    def num_active_jobs(self):
+        # Return the approimate number of active mapjobs
+        return len(self.activekey2job)     
+  
+    def kill_worker(self, n=1):
+        """
+        Tell the worker process to quit after they finish thier current map-request.
+        """
+        for _ in xrange(n):
+            try:
+                self.workers.pop().dismissed = True
+            except KeyError:
+                break   
+    
+    def close(self):
+        """
+        Prevents any more map-requests from being submitted to pool. Once all
+        the requests have been completed the worker process will exit.
+        """
+        self.closed = True
+
+    def terminate(self):
+        """
+        Stops the worker processes immediately without completing outstanding
+        work. When the pool object is garbage collected terminate() will be
+        called immediately.
+        """
+        self.close()
+        # Clearing the job queue
+        try:
+            while 1:
+                self.unassigned_jobs.get_nowait()
+        except Queue.Empty:
+            pass
+
+        # Send one sentinel for each worker process: each process will die
+        # eventually, leaving the next sentinel for the next process
+        for worker in self.workers:
+            self.unassigned_jobs.put(SENTINEL) 
+    
+    def join(self):
+        """Wait for the worker processes to exit. One must call close() or
+        terminate() before using join()."""
+        for worker in self.workers:
+            worker.join()
+                      
+ 
+#==========================Map job class========================================
+       
+class WorkUnit(object):
+    """
+    Base class for a unit of work submitted to the worker process. It's
+    basically just an object with a process() and result() method. This class is
+    not directly usable.
+    """
+    def process(self):
+        """
+        Do the work. 
+        """
+        raise NotImplementedError("Children must override Process")
+  
+    def result(self):
+        """
+        Store the result of work
+        """
+        raise NotImplementedError("Children must override Process")
+
+
+class Map_job(WorkUnit):
+    """
+    A work unit that corresponds to the execution of a map request. A maprequest
+    executes a callable and send its result or exception information.
+    """
+    
+    def __init__(self, func, index, data):
+        self.func = func
+        self.index = index
+        self.data = data
+        self.map_key = id(self)
+
+    def process(self):
+        """
+        process the actual work with given arguments and store the result or its
+        exception information.
+        """
+        try:
+            if isinstance(self.data, list) or isinstance(self.data, tuple):
+                self._result = self.func(*self.data)
+                
+            elif isinstance(self.data, dict):
+                self._result = self.func(**self.data)
+        except:
+            self._exc_info = traceback.format_exc()
+        else:
+            self._exc_info = None
+                                
+    def result(self):
+        """
+        Store the result of map_job or its exception information.       
+        """
+        if self._exc_info is not None:
+            t = self._exc_info
+            logger.error('Service has error %s: '%t)
+            
+        try:
+            return [self.index, self._result]
+        except AttributeError:
+            raise
+ 
+    
+class Map_chunk(WorkUnit):
+    """
+    Class that corresponds to the processing of a continuous sequence of 
+    Map_job objects
+    """
+    def __init__(self, jobs):
+        WorkUnit.__init__(self)
+        self._jobs = jobs
+        self.key = id(self)
+
+    def process(self):
+        """
+        Call process() on all the Map_job objects that have been specified
+        """
+        for job in self._jobs:
+            job.process()
+            
+    def result(self):
+        """
+        Store the result of chunk of map_job
+        """
+        a =[]
+        for job in self._jobs:
+            p = job.result()
+            a.append(p)
+        return a
+
+#===========================Worker class=======================================
+
+class Worker(multiprocessing.Process):
+    """   
+    Background process connected to the input/output job request queues.
+    A worker process sits in the background and picks up map_job requests from
+    one queue and puts the processed requests in another, until it is killed.
+    """
+
+    def __init__(self, inputQueue,  outputQueue, **kwds):
+        """
+        Set up worker process in daemonic mode and start it immediatedly.
+        class when it creates a new worker process.
+        """
+        super(Worker,self).__init__(**kwds)
+        self.daemon =True
+        self.inputQueue = inputQueue
+        self.outputQueue = outputQueue
+        self.dismissed = False
+        self.start()
+        
+    def run(self):
+        """
+        Poll the input job queue indefinitely or until told to exit. Once a job
+        request has been popped from the input queue, process it and add it to
+        the output queue if it's not cancelled, otherwise discard it.
+        """
+        
+        while True:
+            # process blocks here if inputQueue is empty
+            try:
+                job = self.inputQueue.get()
+            except UnboundLocalError:
+                logger.error("problem in polling map job from inputQueue")
+            if is_sentinel(job):
+                break            
+            key = job.key
+                        
+            if self.dismissed: # put back the job we just picked up and exit
+                self.inputQueue.put(job)
+                break
+            
+            job.process()
+            
+            # process blocks here if outputQueue is full
+            self.outputQueue.put(job)
+            
+            
+
+if __name__=='__main__':
+   
+    def func(y,x,*args):
+        return x+y
+
+    x = [1,2,3]
+    y = [4,5,6]
+    arg = [1,2]
+    result = []
+    pool = Mapper()
+
+    print 'hi'
+
+    for i in range(len(x)):
+        for j in range(len(y)):
+            print '2'
+            res = pool.map(func, [y[j], x[i], arg])
+            print '3'
+            result.append(res)
+    print 'result', result
+    pool.terminate()
+    pool.join()
+    
