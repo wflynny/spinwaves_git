@@ -4,7 +4,7 @@ import sys
 import sympy as sp
 import numpy as np
 import sympy.matrices as spm
-from scipy.integrate import dblquad
+from scipy.integrate import dblquad,simps
 from sympy import I,pi,var,exp,oo,sqrt
 from sympy.physics.paulialgebra import delta
 from sympy.core.cache import *
@@ -25,7 +25,8 @@ from periodictable import elements
 sys.path.append('C:/tripleaxisproject-local/ tripleaxisproject/trunk/eclipse/src')
 from rescalculator.lattice_calculator import Lattice, Orientation
 from multiprocessing import Pipe
-from copy import deepcopy
+from copy import deepcopy,copy
+
 
 # Computes the inner product with a metric tensor
 def inner_prod(vect1,vect2,ten = spm.Matrix([[1,0,0],
@@ -675,6 +676,9 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
 
     return kapvect, wtlist, csdata
 
+
+
+@profile
 def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt,
                        temperature, eief = True, efixed = 14.7):
 
@@ -716,9 +720,12 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
 
     ws=[]
 
-    csectempp = deepcopy(csection)
-    csectempm = deepcopy(csection)                    
-
+    #csectempp = deepcopy(csection)  #good
+    #csectempm = deepcopy(csection)  #good             
+    
+    csectempp = copy(csection)  #good
+    csectempm = copy(csection)  #good   
+    
     csectempp = csectempp.subs(sp.DiracDelta(kap_sym - Q_sym - tau_sym),sp.S(1))
     csectempp = csectempp.subs(sp.DiracDelta(kap_sym + Q_sym - tau_sym),sp.S(0))
     csectempm = csectempm.subs(sp.DiracDelta(kap_sym - Q_sym - tau_sym),sp.S(0))
@@ -732,10 +739,12 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     csectempm = csectempm.subs(kapzhat,kapunit[2])
 
     for eigi in range(len(eig_list)):
-        eigcsecp=deepcopy(csectempp)
-        eigcsecm=deepcopy(csectempm)
-
-        eigtemp = deepcopy(eig_list[0][eigi])
+        #eigcsecp=deepcopy(csectempp)  #good
+        #eigcsecm=deepcopy(csectempm)
+        #eigtemp = deepcopy(eig_list[0][eigi])
+        eigcsecp=copy(csectempp)  #good
+        eigcsecm=copy(csectempm)
+        eigtemp = copy(eig_list[0][eigi])
 
         eigtemp = eigtemp.subs(spinmag, sp.S(1.0))
         eigtemp = eigtemp.subs(kx_sym, kap[0])
@@ -778,26 +787,15 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     #Multiply data by front constants
     csdata = front_constant*csdata
 
-    # Form Factor
-    ff = 0
-    for i in range(N_atoms_uc):
-        el = elements[atom_list[i].atomicNum]
-        val = atom_list[i].valence
-        if val != None:
-            Mq = el.magnetic_ff[val].M_Q(kx)
-        else:
-            Mq = el.magnetic_ff[0].M_Q(kx)
-        ff = Mq #ff_list.append(Mq)
-
     #Multiply by Form Factor
-    csdata = g*ff*csdata
+    csdata = g*csdata
     
-    print kx,'\t\t',ky,'\t\t',kz,'\t\t',csdata
+    #print kx,'\t\t',ky,'\t\t',kz,'\t\t',csdata
     return csdata#*np.sin(theta)*rad**2
 
 
-def spherical_averaging(N_atoms_uc, atom_list, rad, csection, tau, eig_list, wt,
-                       temperature, eief = True, efixed = 14.7,theta=None,phi=None,):
+def spherical_averaging(tau, wt, N_atoms_uc, atom_list, rad, csection, eig_list,
+                       temperature, eief = True, efixed = 14.7,thetas=None,phis=None,):
     """
     N_atoms_uc - number of atoms in unit cell
     csection - analytic cross-section expression
@@ -809,36 +807,67 @@ def spherical_averaging(N_atoms_uc, atom_list, rad, csection, tau, eig_list, wt,
     eief - True => E_initial = efixed, False => E_final = efixed
     efixed - fixed energy; either E_final or E_initial, subject to eief
     """
-
-    """
-    i think the problem stems from the fact that the cross-section looks
-    to be well-behaved when we scan through a single line in kx,ky,kz space. 
-    however, it may not be so well behaved everywhere on the sphere; i believe 
-    things blow up at the origin and this might have some effect on what we want.
-    limiting the integration to one geodesic doesn't seem to help.
-    """
-
-    plimL = 0.0#0.01
-    plimU = np.pi/2.0#2*np.pi
-    tlimL = lambda phi: 0.0#0.01
-    tlimU = lambda phi: np.pi/2.0#np.pi
+    
+#    eps = 1e-1
+#    plimL = 0.0#0.01
+#    plimU = 2.0*np.pi#2*np.pi
+#    tlimL = lambda phi: 0.0+eps#0.01
+#    tlimU = lambda phi: np.pi-eps#np.pi
+    
 
     args=(rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt, temperature, eief, efixed)
 
     # theta = y, phi = x
     # y comes first (i.e. f(y,x,(args))
-    def func(t,p,*args):
-        return np.sin(t)*rad**2*single_cross_section_calc(*args)
+#    def func(t,p,*args):
+#        return np.sin(t)*rad**2*single_cross_section_calc(t,p,*args)
 
     theta_test=np.pi/2.0
     phi_test = np.pi/4.0
 
+    thetas = np.linspace(0,np.pi,25) 
+    phis = np.linspace(0,2*np.pi,25)
+    cs = []
+    partial_res=[]
+    
+    # Form Factor
+    ff = 0
+    for i in range(N_atoms_uc):
+        el = elements[atom_list[i].atomicNum]
+        val = atom_list[i].valence
+        if val != None:
+            Mq = el.magnetic_ff[val].M_Q(rad)
+        else:
+            Mq = el.magnetic_ff[0].M_Q(rad)
+        ff = Mq
+    
+    start = clock()
+    print 'calcing cross-section data'
+    for t in thetas:
+        temp_cs = []
+        for p in phis:
+            val = single_cross_section_calc(t,p,*args)*ff
+            temp_cs.append(val)
+        cs.append(temp_cs)
+    end = clock()
+    print end-start
+
+    start = clock()
     print 'integrating'
+    for t in thetas:
+        single_res = simps(temp_cs,phis)
+        partial_res.append(single_res)
+    total_res = simps(partial_res,thetas)
+    print total_res    
+    
+    #res =  dblquad(func, plimL, plimU, tlimL, tlimU, args=args, epsabs=1e-3, epsrel=1e-3)
     #res,err =  dblquad(func, plimL, plimU, tlimL, tlimU, args=args)
-    res,err =  dblquad(single_cross_section_calc, plimL, plimU, tlimL, tlimU, args=args)
+    #res,err =  dblquad(single_cross_section_calc, plimL, plimU, tlimL, tlimU, args=args)
     #res = single_cross_section_calc(theta_test,phi_test,rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt, temperature, eief, efixed)
     print 'done integrating'
-    return res
+    end = clock()
+    print (end - start), "secs"
+    return total_res
 
 def plot_cross_section(xi, wtlist, csdata):
     xi = xi # kapvect[:,0]
@@ -928,6 +957,31 @@ def run_eval_cross_section(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvec
     
     return kapvect,wtlist,csdata
 
+def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,eig_list,wt_list,temperature):
+    theta_list=[]
+    phi_list=[]
+    for kappa in kapvect:
+        kx,ky,kz = kappa[0],kappa[1],kappa[2]
+        r = np.sqrt(kx*kx+ky*ky+kz*kz)
+        theta_list.append(np.arccos(kz/r))
+        phi_list.append(np.arctan2(ky,kx))
+        
+    same_args = (N_atoms_uc, atom_list, rad, csection, eig_list, temperature)
+    wt_temp = []
+    for wt in wt_list:
+        kap_temp = []
+        for kap in kapvect:
+            tau_temp = []
+            for tau in tau_list:
+                #val = spherical_averaging(tau, wt, thetas=theta_list, phis=phi_list, *same_args)
+                val = spherical_averaging(tau, wt, *same_args)
+                tau_temp.append(val)
+            kap_temp.append(sum(tau_temp))
+        wt_temp.append(kap_temp)
+    res_array = np.array(wt_temp)
+    print res_array
+    return kapvect,wtlist,res_array
+
 #---------------- MAIN --------------------------------------------------------- 
 
 
@@ -942,7 +996,7 @@ if __name__=='__main__':
     
     atom_list, jnums, jmats,N_atoms_uc=readFiles(interfile,spinfile)
     
-    N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wtlist,fflist = run_cross_section(interfile,spinfile)
+    N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wt_list,fflist = run_cross_section(interfile,spinfile)
 #    left_conn, right_conn = Pipe()
 #    p = Process(target = create_latex, args = (right_conn, csection, "Cross-Section"))
 #    p.start()
@@ -952,6 +1006,7 @@ if __name__=='__main__':
 #    p.terminate()
     #kapvect,wtlist,csdata=run_eval_cross_section(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wtlist,fflist)
     rad = 1.0
+    temperature = 0.0001
     tau = np.array([0,0,0])
     wt = np.array(1.0)
     w_list = np.linspace(-10,10,50)
@@ -960,7 +1015,9 @@ if __name__=='__main__':
     l_list = np.zeros(h_list.shape)
     points = []
     
-    print spherical_averaging(N_atoms_uc, atom_list, rad, csection, tau, eig_list, wt, 0.0001)
+    x,y,z=run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,eig_list,wt_list,temperature)
+    plot_cross_section(x[:0],y,z)
+    #print spherical_averaging(N_atoms_uc, atom_list, rad, csection, tau, eig_list, wt, 0.0001)
     
 #    for h,k,l in zip(h_list,k_list,l_list):
 #        for ele in w_list:

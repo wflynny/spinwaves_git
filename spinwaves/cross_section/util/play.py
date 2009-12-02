@@ -19,9 +19,9 @@ from printing import *
 from multiprocessing import Process, Lock
 import matplotlib.pyplot as plt
 import spinwaves.spinwavecalc.readfiles as rf
-from scipy.integrate import dblquad
+from scipy.integrate import dblquad, simps
 
-if 1:
+if 0:
     def func(y,x,factor,stuff=1):
         for j in range(100):
             z=x**2+y**2-x*y

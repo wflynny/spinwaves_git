@@ -31,11 +31,11 @@ import time
 import logging
 import traceback
 
-import park
+#import park
 
 # set-up logging
 logger = logging.getLogger('Mapper')
-park.setup_logger(logger=logger, stderr=False)
+#park.setup_logger(logger=logger, stderr=False)
 
 # Item pushed on the input queue to tell the worker process to terminate
 SENTINEL = "QUIT"
@@ -89,7 +89,6 @@ class Mapper(object):
         *f* name of the function
         *v* iterable
         """
-        print '4'
         self.func = f
         self.data = v
         argindex = 0
@@ -97,24 +96,18 @@ class Mapper(object):
         exit_loop = False
         chunk = []
         
-        print '5'
         
         seq = []
         for i in xrange(1):
             job = Map_job(self.func, argindex, self.data)
             argindex += 1
             seq.append(job)
-            
-        print '6'
-                
+                            
         chunk.append(Map_chunk(seq))
-        print '8'
         for seq in chunk:
             self.add_mapjob(seq)
             
-        print '9'
         result = self.collect_work()
-        print '7'
         return result
     
     def add_workers(self, n):
@@ -180,13 +173,10 @@ class Mapper(object):
         # the processed_jobs queue                
        
         while self.activekey2job:
-            print '15'
             try:
-                print '16'
                 job = self.processed_jobs.get()
                 
             except Queue.Empty:
-                print '17'
                 logger.debug('queue empty')
                 
                 break
@@ -202,13 +192,9 @@ class Mapper(object):
         # Return a list of finished mapjob requests.
         try:
             while len(self.outlist)>=0:
-                print '11'
                 res = self.iter_processed_jobs().next()
-                print '14'
                 result = res.result()
-                print '12'
                 for i in result:
-                    print '13'
                     returnindex =  i[0]
                     value = i[1]
                     self.outlist[returnindex] = value  
@@ -216,7 +202,6 @@ class Mapper(object):
         except StopIteration:
             pass
         
-        print '10'
         return self.outlist
 
     def num_of_worker(self):
@@ -406,12 +391,10 @@ class Worker(multiprocessing.Process):
             # process blocks here if outputQueue is full
             self.outputQueue.put(job)
             
-            
+def func(y,x,*args):
+        return x+y         
 
 if __name__=='__main__':
-   
-    def func(y,x,*args):
-        return x+y
 
     x = [1,2,3]
     y = [4,5,6]
@@ -419,13 +402,10 @@ if __name__=='__main__':
     result = []
     pool = Mapper()
 
-    print 'hi'
 
     for i in range(len(x)):
         for j in range(len(y)):
-            print '2'
             res = pool.map(func, [y[j], x[i], arg])
-            print '3'
             result.append(res)
     print 'result', result
     pool.terminate()
