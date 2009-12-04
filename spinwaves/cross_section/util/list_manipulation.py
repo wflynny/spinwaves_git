@@ -1,4 +1,5 @@
 import sympy as sp
+import sympy.matrices as spm
 
 # Method for printing lists neatly
 def list_print(lista):
@@ -6,6 +7,21 @@ def list_print(lista):
     for element in lista:
         print element
     print ''
+
+# Computes the inner product with a metric tensor
+def inner_prod(vect1,vect2,ten = spm.Matrix([[1,0,0],
+                                             [0,1,0],
+                                             [0,0,1]])):
+    # For column vectors -  make sure vectors match eachother as well as # of rows in tensor
+    if vect1.shape == vect2.shape == (3,1) == (ten.lines,1): 
+        return (vect1.T * ten * vect2)[0]
+    # For row vectors -  make sure vectors match eachother as well as # of cols in tensor
+    elif vect1.shape == vect2.shape == (1,3) == (1,ten.cols): 
+        return (vect1 * ten * vect2.T)[0]
+    # Everything else
+    else: 
+        return None
+
 
 # Method for multiplying two lists together
 def list_mult(lista, listb):

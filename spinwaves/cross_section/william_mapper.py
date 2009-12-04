@@ -31,11 +31,9 @@ import time
 import logging
 import traceback
 
-#import park
 
 # set-up logging
 logger = logging.getLogger('Mapper')
-#park.setup_logger(logger=logger, stderr=False)
 
 # Item pushed on the input queue to tell the worker process to terminate
 SENTINEL = "QUIT"
@@ -91,22 +89,24 @@ class Mapper(object):
         """
         self.func = f
         self.data = v
+        self.d = zip(self.data[0], self.data[1])
+        self.arg = self.data[2]
         argindex = 0
-        self.outlist = [None] 
+        self.outlist = [None]*len(self.d) 
         exit_loop = False
         chunk = []
         
-        
         seq = []
-        for i in xrange(1):
-            job = Map_job(self.func, argindex, self.data)
+        for i in self.d:
+            job = Map_job(self.func, argindex, (i[0],i[1],self.arg))
             argindex += 1
             seq.append(job)
-                            
+                
         chunk.append(Map_chunk(seq))
+        
         for seq in chunk:
             self.add_mapjob(seq)
-            
+
         result = self.collect_work()
         return result
     
@@ -130,55 +130,16 @@ class Mapper(object):
         self.unassigned_jobs.put(job)
         self.unassignkey2job[key] = self.activekey2job[key] = job
               
-    def submit_work(self, func, iterable, chunksize=None):
-        """
-        This method chops the iterable into a number of chunks which
-        it submits to the process pool as separate map_jobs. The (approximate)
-        size of these chunks can be specified by setting chunksize to a positive
-        integer. For very long iterables using a large value for chunksize can
-        make make the job complete much faster than using the default value of 1.
-        """
-        self.func = func
-        self.iterable = iterable
-        
-        chunksize, extra = divmod(len(self.iterable), len(self.workers)*4)
-        if extra:
-            chunksize += 1
-        argindex = 0
-        self.outlist = [None] * len(self.iterable)
-        iter_element = iter(self.iterable)
-        exit_loop = False
-        chunk = []
-        
-        while not exit_loop:
-            seq = []
-            for i in xrange(chunksize or 1):
-                try:
-                    arg = iter_element.next()
-                    
-                except StopIteration:
-                    exit_loop = True
-                    break
-                job = Map_job(self.func, argindex, (self.iterable[argindex],))
-                argindex += 1
-                seq.append(job)
-                
-            chunk.append(Map_chunk(seq))
-
-        for seq in chunk:
-            self.add_mapjob(seq)
-
+    
     def iter_processed_jobs(self):
         # Returns an iterator over the finished mapjobs, popping them off from 
         # the processed_jobs queue                
        
         while self.activekey2job:
-            try:
+            try: 
                 job = self.processed_jobs.get()
-                
             except Queue.Empty:
                 logger.debug('queue empty')
-                
                 break
             key = job.key
             
@@ -198,10 +159,10 @@ class Mapper(object):
                     returnindex =  i[0]
                     value = i[1]
                     self.outlist[returnindex] = value  
-                                                           
+                    
         except StopIteration:
             pass
-        
+            
         return self.outlist
 
     def num_of_worker(self):
@@ -392,21 +353,15 @@ class Worker(multiprocessing.Process):
             self.outputQueue.put(job)
             
 def func(y,x,*args):
-        return x+y         
+    return x+y            
 
 if __name__=='__main__':
-
+   
     x = [1,2,3]
     y = [4,5,6]
-    arg = [1,2]
-    result = []
+    arg = ['alpha','beta',7,8]
     pool = Mapper()
-
-
-    for i in range(len(x)):
-        for j in range(len(y)):
-            res = pool.map(func, [y[j], x[i], arg])
-            result.append(res)
+    result = pool.map(func, (x,y,arg))
     print 'result', result
     pool.terminate()
     pool.join()

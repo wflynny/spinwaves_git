@@ -20,6 +20,42 @@ from multiprocessing import Process, Lock
 import matplotlib.pyplot as plt
 import spinwaves.spinwavecalc.readfiles as rf
 from scipy.integrate import dblquad, simps
+from timeit import default_timer as time
+
+if 1:
+
+    def chop(expr,tol=1e-8):
+        for item in expr.atoms():
+            if item < tol:
+                expr = expr.subs(item,0)
+        return expr
+        
+    print chop(1e-16*sp.sin(1.34323412e-9))
+    print np.round(1e-16*np.sin(1.34323412e-9))
+
+if 0:
+    def func1(num):
+        s = time()
+        res = isinstance(num,sp.Symbol)
+        e = time()
+        print e-s
+        return res
+
+    def func2(num):
+        s = time()
+        num = sp.sympify(num)
+        res = num.is_Symbol
+        e = time()
+        print e-s
+        return res
+    
+    p = 3.1415926
+    x = sp.symbols('x')
+    
+    print func1(p)
+    print func2(p)  
+    print func1(x)
+    print func2(x)  
 
 if 0:
     def func(y,x,factor,stuff=1):

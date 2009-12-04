@@ -4,8 +4,8 @@ import sys
 import sympy as sp
 import numpy as np
 import sympy.matrices as spm
-from scipy.integrate import dblquad,simps
-from sympy import I,pi,var,exp,oo,sqrt
+from scipy.integrate import simps
+from sympy import I,pi,exp,oo,sqrt
 from sympy.physics.paulialgebra import delta
 from sympy.core.cache import *
 from timeit import default_timer as clock
@@ -15,7 +15,7 @@ import pylab
 from matplotlib._pylab_helpers import Gcf
 import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
-from numpy import ma
+
 from spinwaves.cross_section.util.list_manipulation import *
 from spinwaves.cross_section.util.subin import sub_in
 from spinwaves.cross_section.util.printing import *
@@ -28,19 +28,46 @@ from multiprocessing import Pipe
 from copy import deepcopy,copy
 
 
-# Computes the inner product with a metric tensor
-def inner_prod(vect1,vect2,ten = spm.Matrix([[1,0,0],
-                                             [0,1,0],
-                                             [0,0,1]])):
-    # For column vectors -  make sure vectors match eachother as well as # of rows in tensor
-    if vect1.shape == vect2.shape == (3,1) == (ten.lines,1): 
-        return (vect1.T * ten * vect2)[0]
-    # For row vectors -  make sure vectors match eachother as well as # of cols in tensor
-    elif vect1.shape == vect2.shape == (1,3) == (1,ten.cols): 
-        return (vect1 * ten * vect2.T)[0]
-    # Everything else
-    else: 
-        return None
+#------------ GLOBAL VARIABLES ---------------------------------------
+
+# ALL GLOBACL VARIABLES ARE CAPTIALIZED
+# ALL GLOBAL SYMBOLS WILL BE IN CAPS, FOLLOWED BY _SYM.
+# ALL OTHER SYMBOLS ARE USUALLY CONSTRUCTED WITH 'sym%i'%(num,)
+
+# define global variables
+T_SYM = sp.Symbol('t', real = True) # t
+L_SYM = sp.Symbol('L', real = True) # L
+Q_SYM = sp.Symbol('q', real = True) # q
+QP_SYM = sp.Symbol('qp', real = True) # qp
+W_SYM = sp.Symbol('w', real = True)
+WQ_SYM = sp.Symbol('wq', real = True) # wq
+WQP_SYM = sp.Symbol('wqp', real = True) #wqp
+S_SYM = sp.Symbol('S', commutative = True) # S
+
+KAP_SYM = sp.Symbol('kappa', real = True) # kap
+TAU_SYM = sp.Symbol('tau', real = True) # tau
+KX_SYM = sp.Symbol('kx', real = True)
+KY_SYM = sp.Symbol('ky', real = True)
+KZ_SYM = sp.Symbol('kz', real = True)
+
+KAPXHAT_SYM = sp.Symbol('kapxhat',real=True)
+KAPYHAT_SYM = sp.Symbol('kapyhat',real=True)
+KAPZHAT_SYM = sp.Symbol('kapzhat',real=True)
+
+# Wilds for sub_in method
+A = sp.Wild('A',exclude = [0,T_SYM])
+B = sp.Wild('B',exclude = [0,T_SYM])
+C = sp.Wild('C')
+D = sp.Wild('D')
+K = sp.Wild('K')
+    
+GAMMA_R0 = 1.913*2.818
+HBAR = 1.0#6.582e-13 
+G = 2.
+LIFETIME = 0.5
+BOLTZ = 8.617343e-2
+DEBYE_WALLER = 1.0 #exp(-2*W)
+
 
 #------------ CROSS SECTION CALC METHODS ---------------------------------------
 
@@ -62,14 +89,10 @@ def generate_a_ad_operators(atom_list, k, b_list, bd_list):
     """Generates a and a dagger operators"""
     a_list = []; ad_list = []
     N = len(atom_list)
-    t = sp.Symbol('t', real = True)
-    q = sp.Symbol('q', real = True)
-    L = sp.Symbol('L', real = True)
-    wq = sp.Symbol('wq', real = True)
 
     for i in range(N):
-        a_list.append(exp(I*(q*L - wq*t)) * b_list[i])
-        ad_list.append(exp(-I*(q*L - wq*t)) * bd_list[i])
+        a_list.append(exp(I*(Q_SYM*L_SYM - WQ_SYM*T_SYM)) * b_list[i])
+        ad_list.append(exp(-I*(Q_SYM*L_SYM - WQ_SYM*T_SYM)) * bd_list[i])
 
     a = sp.Pow(sp.sqrt(N),-1) * sum(a_list)
     ad = sp.Pow(sp.sqrt(N),-1) * sum(ad_list)
@@ -80,21 +103,19 @@ def generate_a_ad_operators(atom_list, k, b_list, bd_list):
 # Generates the Sp and Sm operators
 def generate_Sp_Sm_operators(atom_list, a, ad):
     """Generates S+ and S- operators"""
-    S = sp.Symbol('S', commutative = True)
 
-    Sp = sp.sqrt(2*S) * a
-    Sm = sp.sqrt(2*S) * ad
+    Sp = sp.sqrt(2*S_SYM) * a
+    Sm = sp.sqrt(2*S_SYM) * ad
 
     print "Operators Generated: Sp, Sm"
     return (Sp,Sm)
 
 def generate_Sa_Sb_Sn_operators(atom_list, Sp, Sm):
     """Generates Sa, Sb, Sn operators"""
-    S = sp.Symbol('S', commutative = True)
 
     Sa = ((1/2)*(Sp+Sm)).expand()
     Sb = ((1/2)*(1/I)*(Sp-Sm)).expand()
-    Sn = (S - sp.Pow(2*S,-1) * Sm.expand() * Sp.expand()).expand()
+    Sn = (S_SYM - sp.Pow(2*S_SYM,-1) * Sm.expand() * Sp.expand()).expand()
 
     print "Operators Generated: Sa, Sb, Sn"
     return (Sa, Sb, Sn)
@@ -104,7 +125,7 @@ def generate_Sx_Sy_Sz_operators(atom_list, Sa, Sb, Sn):
     """Generates Sx, Sy and Sz operators"""
     Sx_list = []; Sy_list = []; Sz_list = []
     N = len(atom_list)
-    S = sp.Symbol('S', commutative = True)
+
     loc_vect = spm.Matrix([Sa,Sb,Sn])
     loc_vect = loc_vect.reshape(3,1)
 
@@ -119,53 +140,12 @@ def generate_Sx_Sy_Sz_operators(atom_list, Sa, Sb, Sn):
         Sx_list.append(Sx)
         Sy_list.append(Sy)
         Sz_list.append(Sz)
-        
-    #Unit vector markers
-    kapxhat = sp.Symbol('kapxhat',real = True)
-    kapyhat = sp.Symbol('kapyhat',real = True)
-    kapzhat = sp.Symbol('kapzhat',real = True)
-    
-    Sx_list.append(kapxhat)
-    Sy_list.append(kapyhat)
-    Sz_list.append(kapzhat)
+            
+    Sx_list.append(KAPXHAT_SYM)
+    Sy_list.append(KAPYHAT_SYM)
+    Sz_list.append(KAPZHAT_SYM)
     print "Operators Generated: Sx, Sy, Sz"
     return (Sx_list,Sy_list,Sz_list)
-
-# Generate Hamiltonian
-def generate_Hamiltonian(atom_list, b_list, bd_list):
-    """Generates the Hamiltonian operator"""
-    N = len(atom_list)
-    S = sp.Symbol('S', commutative = True)
-
-    J = sp.Function('J')
-    q = sp.Symbol('q', commutative = True)
-    l = sp.Symbol('l', commutative = True)
-    lp = sp.Symbol('lp', commutative = True)
-    rho = sp.Symbol('p', commutative = True)
-    rho = l - lp
-
-    # Define Curly J function
-    def cJ(N,q):
-        temp = []
-        for i in range(N):
-            temp.append(J(0-i) * sp.exp(I * q * (0-i)))
-        return sum(temp)
-
-    # Define hbar*omega_q function
-    def hbwq(N,q):
-        return 2*S * (cJ(N,0) - cJ(N,q))
-
-    Ham0 = -S**2 * N * cJ(N,0)
-
-    # Sum over hbar*omega_q for all q
-    temp2 = []
-    for i in range(N):
-        temp2.append(hbwq(N,i) * bd_list[i] * b_list[i])
-    Ham_sum = sum(temp2)
-    Ham = Ham0 + Ham_sum
-
-    print "Generated: Hamiltonian"
-    return Ham
 
 # Define a method that generates the possible combinations of operators
 def generate_possible_combinations(atom_list, alist):
@@ -175,17 +155,11 @@ def generate_possible_combinations(atom_list, alist):
     op_list = []
     alista = []
     N = len(atom_list)
-    t = sp.Symbol('t', real = True)
-    L = sp.Symbol('L', real = True)
-    q = sp.Symbol('q', real = True)
-    qp = sp.Symbol('qp', real = True)
-    wq = sp.Symbol('wq', real = True)
-    wqp = sp.Symbol('wqp', real = True)
 
-    alista = [[subelement.subs(t, 0) for subelement in element] for element in alist]
+    alista = [[subelement.subs(T_SYM, 0) for subelement in element] for element in alist]
     for ele in alista:
         for sub in ele:
-            sub = sub.subs(L,0)
+            sub = sub.subs(L_SYM,0)
 
     for i in range(len(alist)):
         for j in range(len(alist)):
@@ -194,8 +168,8 @@ def generate_possible_combinations(atom_list, alist):
             if cmp(vect1, vect2) == 0: delta = 1
             else: delta = 0
 
-            allzerolist = [alista[i][0].subs(L,0) for k in range(len(alista[i])-1)]+[delta-vect1*vect2]
-            otherlist = [alist[j][k].subs(q,qp).subs(wq,wqp) for k in range(len(alist[j])-1)]+[1]
+            allzerolist = [alista[i][0].subs(L_SYM,0) for k in range(len(alista[i])-1)]+[delta-vect1*vect2]
+            otherlist = [alist[j][k].subs(Q_SYM,QP_SYM).subs(WQ_SYM,WQP_SYM) for k in range(len(alist[j])-1)]+[1]
             append_list = list_mult(allzerolist,otherlist)
             print 'here',append_list
             op_list.append(append_list)
@@ -206,8 +180,7 @@ def generate_possible_combinations(atom_list, alist):
 def holstein(atom_list, arg):
     new = []
     N = len(atom_list)
-    S = sp.Symbol('S', real = True)
-    t = sp.Symbol('t', real = True)
+
     for k in range(len(arg)):
         temp = []
         for i in range(N):
@@ -217,17 +190,17 @@ def holstein(atom_list, arg):
             #works since arg[k][i] is an Add instance so args breaks it up at '+'s
             pieces = arg[k][i].args
             for piece in pieces:
-                if not piece.has(t):
+                if not piece.has(T_SYM):
                     arg[k][i] = arg[k][i] - piece
 
-            S2coeff = coeff(arg[k][i], S**2)
-            Scoeff = coeff(arg[k][i], S)
+            S2coeff = coeff(arg[k][i], S_SYM**2)
+            Scoeff = coeff(arg[k][i], S_SYM)
             if S2coeff != None and Scoeff != None:
-                temp.append((S2coeff*S**2 + Scoeff*S).subs(S,Snew))
+                temp.append((S2coeff*S_SYM**2 + Scoeff*S_SYM).subs(S_SYM,Snew))
             elif S2coeff != None and Scoeff == None:
-                temp.append((S2coeff*S**2).subs(S,Snew))
+                temp.append((S2coeff*S_SYM**2).subs(S_SYM,Snew))
             elif S2coeff == None and Scoeff != None:
-                temp.append((Scoeff*S).subs(S,Snew))
+                temp.append((Scoeff*S_SYM).subs(S_SYM,Snew))
         if temp != []:
             if temp[0] != 0:
                 temp.append(arg[k][-1])
@@ -243,7 +216,6 @@ def reduce_options(atom_list, arg):
     """
     new = []
     N = len(atom_list)
-    t = sp.Symbol('t')
     for element in arg:
         if str(element[0]).find('t') > 0:
             new.append(element)
@@ -321,15 +293,10 @@ def replace_bdb(atom_list, arg):
                     arg[k][i] = (arg[k][i].subs((bdg*nj), 0))
                     arg[k][i] = (arg[k][i].subs((bg*nj), 0))
 
-            q = sp.Symbol('q', real = True)
-            qp = sp.Symbol('qp', real = True)
-            wq = sp.Symbol('wq', real = True)
-            wqp = sp.Symbol('wqp', real = True)
-            arg[k][i] = arg[k][i].subs(qp,q).subs(wqp,wq)
+            arg[k][i] = arg[k][i].subs(QP_SYM,Q_SYM).subs(WQP_SYM,WQ_SYM)
 
     print "Applied: bdq*bq Replacement"
     return arg
-
 
 def eq(a,b,tol=2e-1):
         c = (abs(a-b) < tol)
@@ -377,9 +344,6 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     kapunit[:,2]=kapvect[:,2]/kaprange
 
     unit_vect = []
-    kapxhat = sp.Symbol('kapxhat',real=True)
-    kapyhat = sp.Symbol('kapyhat',real=True)
-    kapzhat = sp.Symbol('kapzhat',real=True)
     for i in range(len(arg)):
         unit_vect.append(arg[i].pop())
     #print unit_vect
@@ -422,27 +386,6 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
             Mq = el.magnetic_ff[0].M_Q(kaprange)
         ff_list = Mq #ff_list.append(Mq)
     print "Calculated: Form Factors"
-
-    # Other Constants
-    gamr0 = 2*0.2695e-12 #sp.Symbol('gamma', commutative = True)
-    hbar = sp.S(1.0) # 1.05457148*10**(-34) #sp.Symbol('hbar', commutative = True)
-    g = 2.#sp.Symbol('g', commutative = True)
-    kap = sp.Symbol('kappa', real = True)#spm.Matrix([sp.Symbol('kapx',real = True),sp.Symbol('kapy',real = True),sp.Symbol('kapz',real = True)])
-    t = sp.Symbol('t', real = True)
-    w = sp.Symbol('w', real = True)
-    W = sp.Symbol('W', real = True)
-    tau = sp.Symbol('tau', real = True)
-    Q = sp.Symbol('q', real = True)
-    L = sp.Symbol('L', real = True)
-    lifetime=0.5#sp.Symbol('V',real=True)
-    boltz = 8.617343e-2
-
-    # Wilds for sub_in method
-    A = sp.Wild('A',exclude = [0,t])
-    B = sp.Wild('B',exclude = [0,t])
-    C = sp.Wild('C')
-    D = sp.Wild('D')
-    K = sp.Wild('K')
     
     # Generate most general form of csection
     csection=0
@@ -456,32 +399,32 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
         csection.subs(ni+1,np1i)
 
     csection = csection.expand()
+
+    csection = csection.subs(KAPXHAT_SYM*KAPYHAT_SYM,0)
+    csection = csection.subs(KAPXHAT_SYM*KAPZHAT_SYM,0)
+    csection = csection.subs(KAPYHAT_SYM*KAPZHAT_SYM,0)
+    csection = csection.subs(KAPZHAT_SYM*KAPYHAT_SYM,0)
+    csection = csection.subs(KAPZHAT_SYM*KAPXHAT_SYM,0)
+    csection = csection.subs(KAPYHAT_SYM*KAPXHAT_SYM,0)
         
-    csection = csection.subs(kapxhat*kapyhat,0)
-    csection = csection.subs(kapxhat*kapzhat,0)
-    csection = csection.subs(kapyhat*kapzhat,0)
-    csection = csection.subs(kapzhat*kapyhat,0)
-    csection = csection.subs(kapzhat*kapxhat,0)
-    csection = csection.subs(kapyhat*kapxhat,0)
-        
-    csection = (csection * exp(-I*w*t) * exp(I*kap*L)).expand(deep=False)
+    csection = (csection * exp(-I * W_SYM * T_SYM) * exp(I * KAP_SYM * L_SYM)).expand(deep=False)
     csection = sp.powsimp(csection, deep=True)
     print 'beginning'
     print csection
     csection = sp.powsimp(csection)
-    csection = sub_in(csection,exp(I*t*A + I*t*B + I*C + I*D + I*K),sp.DiracDelta(A*t + B*t + C + D + K))
+    csection = sub_in(csection,exp(I*T_SYM*A + I*T_SYM*B + I*C + I*D + I*K),sp.DiracDelta(A*T_SYM + B*T_SYM + C + D + K))
     print 'intermediate'
     print csection
 #    csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),(1./hbar)*sp.DiracDelta(A + B)*sp.simplify(sp.DiracDelta(C + D  - tau)))  #This is correct
-    csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),sp.Pow(pi,-1)*(lifetime*0.5)*sp.Pow((A+B)**2+(lifetime*0.5)**2,-1)*sp.simplify(sp.DiracDelta(C + D  - tau)))
+    csection = sub_in(csection,sp.DiracDelta(A*T_SYM + B*T_SYM + C*L_SYM + D*L_SYM ),sp.Pow(pi,-1)*(LIFETIME*0.5)*sp.Pow((A+B)**2+(LIFETIME*0.5)**2,-1)*sp.simplify(sp.DiracDelta(C + D  - TAU_SYM)))
     print 'ending'
     print csection
     
     # Do some associative clean up to make it easier for later substitutions
     csection = sub_in(csection,sp.DiracDelta(-A - B),sp.DiracDelta(A + B))
     csection = sub_in(csection,(-A - B)**2,(A + B)**2)
-    csection = csection.subs(sp.DiracDelta(Q+tau-kap),sp.DiracDelta(kap-Q-tau))
-    csection = csection.subs(sp.DiracDelta(tau-kap-Q),sp.DiracDelta(kap+Q-tau))
+    csection = csection.subs(sp.DiracDelta(Q_SYM + TAU_SYM - KAP_SYM),sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM))
+    csection = csection.subs(sp.DiracDelta(TAU_SYM - KAP_SYM - Q_SYM),sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM))
     print "Applied: Delta Function Conversion"
 
     print "Generated: Analytic Cross-Section Expression"
@@ -505,31 +448,13 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     
     print "Begin Numerical Evaluation of Cross-Section"
 
-    # Kappa vector
-    kap = sp.Symbol('kappa', real = True)
-    t = sp.Symbol('t', real = True)
-    w = sp.Symbol('w', real = True)
-    tau = sp.Symbol('tau', real = True)
-    Q = sp.Symbol('q', real = True)
-    wq = sp.Symbol('wq', real = True)
-    kapxhat = sp.Symbol('kapxhat',real=True)
-    kapyhat = sp.Symbol('kapyhat',real=True)
-    kapzhat = sp.Symbol('kapzhat',real=True)
-
     kapunit = kapvect.copy()
     kapunit[:,0]=kapvect[:,0]/kaprange
     kapunit[:,1]=kapvect[:,1]/kaprange
     kapunit[:,2]=kapvect[:,2]/kaprange    
 
-    # Front constants and stuff for the cross-section
-    boltz = 8.617343e-2
-    gamr0 = 1.913*2.818
-    hbar = 1#6.582e-13 
-    g = 2.0
     temperature = temperature
-
-    debye_waller = 1.0 #exp(-2*W)
-    front_constant = ((gamr0**2)*debye_waller/(2*pi*hbar)).evalf() #(gamr0)**2#/(2*pi*hbar)
+    front_constant = ((GAMMA_R0**2)*DEBYE_WALLER/(2*pi*HBAR)).evalf() #(gamr0)**2#/(2*pi*hbar)
     print front_constant
     
     # kappa, omegas, tau, eigs
@@ -551,21 +476,21 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
                 #qvalp = kapvect[kapi] - tau_list[taui] + qmins
                 #qvalm = kapvect[kapi] - tau_list[taui] - qplus
 
-                csectempp = csectempp.subs(sp.DiracDelta(kap - Q - tau),sp.S(1))
-                csectempp = csectempp.subs(sp.DiracDelta(kap + Q - tau),sp.S(0))
-                csectempm = csectempm.subs(sp.DiracDelta(kap - Q - tau),sp.S(0))
-                csectempm = csectempm.subs(sp.DiracDelta(kap + Q - tau),sp.S(1))
+                csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(1))
+                csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(0))
+                csectempm = csectempm.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(0))
+                csectempm = csectempm.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(1))
 #                print 'm'
 #                print csectempm
 #                print 'p'
 #                print csectempp
 
-                csectempp = csectempp.subs(kapxhat,kapunit[kapi,0])
-                csectempp = csectempp.subs(kapyhat,kapunit[kapi,1])
-                csectempp = csectempp.subs(kapzhat,kapunit[kapi,2])
-                csectempm = csectempm.subs(kapxhat,kapunit[kapi,0])
-                csectempm = csectempm.subs(kapyhat,kapunit[kapi,1])
-                csectempm = csectempm.subs(kapzhat,kapunit[kapi,2])
+                csectempp = csectempp.subs(KAPXHAT_SYM,kapunit[kapi,0])
+                csectempp = csectempp.subs(KAPYHAT_SYM,kapunit[kapi,1])
+                csectempp = csectempp.subs(KAPZHAT_SYM,kapunit[kapi,2])
+                csectempm = csectempm.subs(KAPXHAT_SYM,kapunit[kapi,0])
+                csectempm = csectempm.subs(KAPYHAT_SYM,kapunit[kapi,1])
+                csectempm = csectempm.subs(KAPZHAT_SYM,kapunit[kapi,2])
 
                 for eigi in range(len(eig_list[taui])):
                     eigcsecp=deepcopy(csectempp)
@@ -579,19 +504,14 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
 
 #                    print 'eig', eigtemp
 
-                    spinmag = sp.Symbol('S', real = True)
-                    kx = sp.Symbol('kx', real = True)
-                    ky = sp.Symbol('ky', real = True)
-                    kz = sp.Symbol('kz', real = True)
-
 #                    print 'kappa'
 #                    print kapvect[kapi][0]
 #                    print kapvect[kapi][1]
 #                    print kapvect[kapi][2]
-                    eigtemp = eigtemp.subs(spinmag, sp.S(1.0))
-                    eigtemp = eigtemp.subs(kx, kapvect[kapi][0])
-                    eigtemp = eigtemp.subs(ky, kapvect[kapi][1])
-                    eigtemp = eigtemp.subs(kz, kapvect[kapi][2])
+                    eigtemp = eigtemp.subs(S_SYM, sp.S(1.0))
+                    eigtemp = eigtemp.subs(KX_SYM, kapvect[kapi][0])
+                    eigtemp = eigtemp.subs(KY_SYM, kapvect[kapi][1])
+                    eigtemp = eigtemp.subs(KZ_SYM, kapvect[kapi][2])
                     eigtemp = sp.abs(eigtemp.evalf(chop=True))
 #                    sp.Pow( sp.exp(-np.abs(eig_list[0][eigi])/boltz) - 1 ,-1) #\temperature term taken out
 
@@ -603,7 +523,7 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
 #                    print eigcsecm
 
 
-                    nval = sp.Pow(sp.exp(sp.abs(eigtemp)/(boltz*temperature))-1,-1).evalf()
+                    nval = sp.Pow(sp.exp(sp.abs(eigtemp)/(BOLTZ*temperature))-1,-1).evalf()
                     for i in range(N_atoms_uc):
                         nq = sp.Symbol('n%i'%(i,), real = True)
                         eigcsecp = eigcsecp.subs(nq,nval)
@@ -619,11 +539,11 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
 #                    print wvalp
 #                    print wvalm
 
-                    eigcsecp = eigcsecp.subs((w-wq),wvalp)
-                    eigcsecp = eigcsecp.subs((w+wq),wvalm)
+                    eigcsecp = eigcsecp.subs((W_SYM - WQ_SYM),wvalp)
+                    eigcsecp = eigcsecp.subs((W_SYM + WQ_SYM),wvalm)
                     eigcsecp = sp.re(eigcsecp.evalf(chop = True))
-                    eigcsecm = eigcsecm.subs((w-wq),wvalp)
-                    eigcsecm = eigcsecm.subs((w+wq),wvalm)
+                    eigcsecm = eigcsecm.subs((W_SYM - WQ_SYM),wvalp)
+                    eigcsecm = eigcsecm.subs((W_SYM + WQ_SYM),wvalm)
                     eigcsecm = sp.re(eigcsecm.evalf(chop = True))
 
 #                    if np.abs(wvalp) < 0.1: 
@@ -672,34 +592,23 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     
     #Multiply by Form Factor
     print fflist.shape
-    csdata = g*fflist*csdata
+    csdata = G*fflist*csdata
 
     return kapvect, wtlist, csdata
 
+def chop(expr,tol=1e-8):
+    for item in expr.atoms():
+        if item < tol:
+            expr = expr.subs(item,0)
+    return expr
 
-
-@profile
+#@profile
 def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt,
                        temperature, eief = True, efixed = 14.7):
 
-    # Front constants and stuff for the cross-section
-    boltz = 8.617343e-2
-    gamr0 = 1.913*2.818
-    hbar = 1#6.582*10**-13 
-    g = 2.0
     temperature = temperature
 
-    kap_sym = sp.Symbol('kappa', real = True)
-    tau_sym = sp.Symbol('tau', real = True)
-    w_sym = sp.Symbol('w', real = True)
-    Q_sym = sp.Symbol('q', real = True)
-    wq_sym = sp.Symbol('wq', real = True)
-    kapxhat = sp.Symbol('kapxhat',real=True)
-    kapyhat = sp.Symbol('kapyhat',real=True)
-    kapzhat = sp.Symbol('kapzhat',real=True)
-    
-    debye_waller = 1.0 #exp(-2*W)
-    front_constant = ((gamr0**2)*debye_waller/(2*pi*hbar)).evalf() #(gamr0)**2#/(2*pi*hbar)
+    front_constant = ((GAMMA_R0**2)*DEBYE_WALLER/(2*pi*HBAR)).evalf()
  
     kx = rad*np.sin(theta)*np.cos(phi)
     ky = rad*np.sin(theta)*np.sin(phi)
@@ -713,11 +622,6 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     kapunit[1]=kap[1]/kapmod
     kapunit[2]=kap[2]/kapmod    
 
-    spinmag = sp.Symbol('S', real = True)
-    kx_sym = sp.Symbol('kx', real = True)
-    ky_sym = sp.Symbol('ky', real = True)
-    kz_sym = sp.Symbol('kz', real = True)
-
     ws=[]
 
     #csectempp = deepcopy(csection)  #good
@@ -726,17 +630,17 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     csectempp = copy(csection)  #good
     csectempm = copy(csection)  #good   
     
-    csectempp = csectempp.subs(sp.DiracDelta(kap_sym - Q_sym - tau_sym),sp.S(1))
-    csectempp = csectempp.subs(sp.DiracDelta(kap_sym + Q_sym - tau_sym),sp.S(0))
-    csectempm = csectempm.subs(sp.DiracDelta(kap_sym - Q_sym - tau_sym),sp.S(0))
-    csectempm = csectempm.subs(sp.DiracDelta(kap_sym + Q_sym - tau_sym),sp.S(1))
+    csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(1))
+    csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(0))
+    csectempm = csectempm.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(0))
+    csectempm = csectempm.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(1))
 
-    csectempp = csectempp.subs(kapxhat,kapunit[0])
-    csectempp = csectempp.subs(kapyhat,kapunit[1])
-    csectempp = csectempp.subs(kapzhat,kapunit[2])
-    csectempm = csectempm.subs(kapxhat,kapunit[0])
-    csectempm = csectempm.subs(kapyhat,kapunit[1])
-    csectempm = csectempm.subs(kapzhat,kapunit[2])
+    csectempp = csectempp.subs(KAPXHAT_SYM,kapunit[0])
+    csectempp = csectempp.subs(KAPYHAT_SYM,kapunit[1])
+    csectempp = csectempp.subs(KAPZHAT_SYM,kapunit[2])
+    csectempm = csectempm.subs(KAPXHAT_SYM,kapunit[0])
+    csectempm = csectempm.subs(KAPYHAT_SYM,kapunit[1])
+    csectempm = csectempm.subs(KAPZHAT_SYM,kapunit[2])
 
     for eigi in range(len(eig_list)):
         #eigcsecp=deepcopy(csectempp)  #good
@@ -746,13 +650,15 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
         eigcsecm=copy(csectempm)
         eigtemp = copy(eig_list[0][eigi])
 
-        eigtemp = eigtemp.subs(spinmag, sp.S(1.0))
-        eigtemp = eigtemp.subs(kx_sym, kap[0])
-        eigtemp = eigtemp.subs(ky_sym, kap[1])
-        eigtemp = eigtemp.subs(kz_sym, kap[2])
-        eigtemp = sp.abs(eigtemp.evalf(chop=True))
+        eigtemp = eigtemp.subs(S_SYM, sp.S(1.0))
+        eigtemp = eigtemp.subs(KX_SYM, kap[0])
+        eigtemp = eigtemp.subs(KY_SYM, kap[1])
+        eigtemp = eigtemp.subs(KZ_SYM, kap[2])
+        eigtemp = sp.abs(eigtemp.evalf(chop=True)) #works
+        #eigtemp = chop(np.abs(eigtemp))
 
-        nval = sp.Pow(sp.exp(sp.abs(eigtemp)/(boltz*temperature))-1,-1).evalf()
+        nval = sp.Pow(sp.exp(eigtemp/(BOLTZ*temperature))-1,-1).evalf() #works
+        #nval = np.power(np.exp(np.abs(eigtemp)/(BOLTZ*temperature))-1,-1)
         for i in range(N_atoms_uc):
             nq = sp.Symbol('n%i'%(i,), real = True)
             eigcsecp = eigcsecp.subs(nq,nval)
@@ -761,12 +667,14 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
         wvalp = eigtemp - wt
         wvalm = eigtemp + wt
 
-        eigcsecp = eigcsecp.subs((w_sym - wq_sym),wvalp)
-        eigcsecp = eigcsecp.subs((w_sym + wq_sym),wvalm)
-        eigcsecp = sp.re(eigcsecp.evalf(chop = True))
-        eigcsecm = eigcsecm.subs((w_sym - wq_sym),wvalp)
-        eigcsecm = eigcsecm.subs((w_sym + wq_sym),wvalm)
-        eigcsecm = sp.re(eigcsecm.evalf(chop = True))
+        eigcsecp = eigcsecp.subs((W_SYM - WQ_SYM),wvalp)
+        eigcsecp = eigcsecp.subs((W_SYM + WQ_SYM),wvalm)
+        eigcsecp = sp.re(eigcsecp.evalf(chop = True)) # works
+        #eigcsecp = chop(eigcsecp)
+        eigcsecm = eigcsecm.subs((W_SYM - WQ_SYM),wvalp)
+        eigcsecm = eigcsecm.subs((W_SYM + WQ_SYM),wvalm)
+        eigcsecm = sp.re(eigcsecm.evalf(chop = True)) #works
+        #eigcsecm = chop(eigcsecm)
 
         # eief == True => ei=efixed
         # eief == False => ef=efixed
@@ -788,7 +696,7 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     csdata = front_constant*csdata
 
     #Multiply by Form Factor
-    csdata = g*csdata
+    csdata = G*csdata
     
     #print kx,'\t\t',ky,'\t\t',kz,'\t\t',csdata
     return csdata#*np.sin(theta)*rad**2
@@ -808,19 +716,7 @@ def spherical_averaging(tau, wt, N_atoms_uc, atom_list, rad, csection, eig_list,
     efixed - fixed energy; either E_final or E_initial, subject to eief
     """
     
-#    eps = 1e-1
-#    plimL = 0.0#0.01
-#    plimU = 2.0*np.pi#2*np.pi
-#    tlimL = lambda phi: 0.0+eps#0.01
-#    tlimU = lambda phi: np.pi-eps#np.pi
-    
-
     args=(rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt, temperature, eief, efixed)
-
-    # theta = y, phi = x
-    # y comes first (i.e. f(y,x,(args))
-#    def func(t,p,*args):
-#        return np.sin(t)*rad**2*single_cross_section_calc(t,p,*args)
 
     theta_test=np.pi/2.0
     phi_test = np.pi/4.0
@@ -846,11 +742,11 @@ def spherical_averaging(tau, wt, N_atoms_uc, atom_list, rad, csection, eig_list,
     for t in thetas:
         temp_cs = []
         for p in phis:
-            val = single_cross_section_calc(t,p,*args)*ff
+            val = single_cross_section_calc(t,p,*args)*ff*np.sin(t)*rad**2
             temp_cs.append(val)
         cs.append(temp_cs)
     end = clock()
-    print end-start
+    print end-start, "secs"
 
     start = clock()
     print 'integrating'
@@ -859,14 +755,10 @@ def spherical_averaging(tau, wt, N_atoms_uc, atom_list, rad, csection, eig_list,
         partial_res.append(single_res)
     total_res = simps(partial_res,thetas)
     print total_res    
-    
-    #res =  dblquad(func, plimL, plimU, tlimL, tlimU, args=args, epsabs=1e-3, epsrel=1e-3)
-    #res,err =  dblquad(func, plimL, plimU, tlimL, tlimU, args=args)
-    #res,err =  dblquad(single_cross_section_calc, plimL, plimU, tlimL, tlimU, args=args)
-    #res = single_cross_section_calc(theta_test,phi_test,rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt, temperature, eief, efixed)
+
     print 'done integrating'
     end = clock()
-    print (end - start), "secs"
+    print (end - start), "secs","\n"
     return total_res
 
 def plot_cross_section(xi, wtlist, csdata):
@@ -899,10 +791,7 @@ def run_cross_section(interactionfile, spinfile):
     atom_list=atom_list[:N_atoms_uc]
     N_atoms = len(atom_list)
 
-    kx = sp.Symbol('kx', real = True)
-    ky = sp.Symbol('ky', real = True)
-    kz = sp.Symbol('kz', real = True)
-    k = spm.Matrix([kx,ky,kz])
+    k = spm.Matrix([KX_SYM,KY_SYM,KZ_SYM])
     
     (b,bd) = generate_b_bd_operators(atom_list)
     (a,ad) = generate_a_ad_operators(atom_list, k, b, bd)
