@@ -88,19 +88,32 @@ class Mapper(object):
         *v* iterable
         """
         self.func = f
+        
         self.data = v
-        self.d = zip(self.data[0], self.data[1])
-        self.arg = self.data[2]
+        #self.d = zip(self.data[0], self.data[1])
+        self.p = self.data[0]
+        print 'first list', self.p
+        self.q = self.data[1]
+        print 'second list', self.q
+        self.r = self.data[2]
+        self.arg = self.data[3]
+        print 'list', self.arg
         argindex = 0
-        self.outlist = [None]*len(self.d) 
+        self.outlist = [None]*len(self.p) 
         exit_loop = False
         chunk = []
-        
         seq = []
-        for i in self.d:
-            job = Map_job(self.func, argindex, (i[0],i[1],self.arg))
+        for i in range (len(self.p)):
+            job = Map_job(self.func, argindex,self.p[i],self.q[0],self.r,self.arg)
             argindex += 1
             seq.append(job)
+        #print self.func, self.data, self.d
+        
+#        seq = []
+#        for i in self.d:
+#            job = Map_job(self.func, argindex, i[0],i[1],self.arg)
+#            argindex += 1
+#            seq.append(job)
                 
         chunk.append(Map_chunk(seq))
         
@@ -242,10 +255,13 @@ class Map_job(WorkUnit):
     executes a callable and send its result or exception information.
     """
     
-    def __init__(self, func, index, data):
+    def __init__(self, func, index, datax, datay, dataz, datarg):
         self.func = func
         self.index = index
-        self.data = data
+        self.x = datax
+        self.y = datay
+        self.z = dataz
+        self.arg = datarg
         self.map_key = id(self)
 
     def process(self):
@@ -254,15 +270,23 @@ class Map_job(WorkUnit):
         exception information.
         """
         try:
-            if isinstance(self.data, list) or isinstance(self.data, tuple):
-                self._result = self.func(*self.data)
-                
-            elif isinstance(self.data, dict):
-                self._result = self.func(**self.data)
+            self._result = self.func(self.x,self.y,self.z,*self.arg)
+            print 'result', self._result
         except:
             self._exc_info = traceback.format_exc()
         else:
             self._exc_info = None
+                
+#        try:
+#            if isinstance(self.data, list) or isinstance(self.data, tuple):
+#                self._result = self.func(self.x,self.y,*self.arg)
+#                print 'result', self._result
+#            elif isinstance(self.data, dict):
+#                self._result = self.func(**self.data)
+#        except:
+#            self._exc_info = traceback.format_exc()
+#        else:
+#            self._exc_info = None
                                 
     def result(self):
         """
@@ -270,9 +294,10 @@ class Map_job(WorkUnit):
         """
         if self._exc_info is not None:
             t = self._exc_info
-            logger.error('Service has error %s: '%t)
+            print('Service has error %s: '%t)
             
         try:
+            print [self.index, self._result]
             return [self.index, self._result]
         except AttributeError:
             raise
@@ -353,7 +378,7 @@ class Worker(multiprocessing.Process):
             self.outputQueue.put(job)
             
 def func(y,x,*args):
-    return x+y            
+    return x*y        
 
 if __name__=='__main__':
    
