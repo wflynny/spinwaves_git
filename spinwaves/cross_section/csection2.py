@@ -434,6 +434,8 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
         ff_list = Mq #ff_list.append(Mq)
     print "Calculated: Form Factors"
     
+    list_print(arg)
+    
     # Generate most general form of csection
     csection=0
     for i in range(len(arg)):
@@ -784,28 +786,27 @@ def spherical_averaging(rad, wt, tau, N_atoms_uc, atom_list, csection, eig_list,
             Mq = el.magnetic_ff[0].M_Q(rad)
         ff = Mq
     
-    start = clock()
-    print 'calcing cross-section data'
+    start1 = clock()
     for t in thetas:
         temp_cs = []
         for p in phis:
             val = single_cross_section_calc(t,p,*args)*ff*np.sin(t)*rad**2
             temp_cs.append(val)
         cs.append(temp_cs)
-    end = clock()
-    print end-start, "secs"
+    end1 = clock()
+    calc_time = end1-start1
 
-    start = clock()
-    print 'integrating'
+    start2 = clock()
     for t in thetas:
         single_res = simps(temp_cs,phis)
         partial_res.append(single_res)
     total_res = simps(partial_res,thetas)
-    print total_res    
 
-    print 'done integrating'
-    end = clock()
-    print (end - start), "secs","\n"
+    end2 = clock()
+    inte_time = end2-start2
+    print 'result', total_res
+    print 'calc time', calc_time
+    print 'inte time', inte_time
     return total_res
 
 def plot_cross_section(xi, wtlist, csdata, myFlag = True):
@@ -856,7 +857,6 @@ def run_cross_section(interactionfile, spinfile):
     ops = holstein(atom_list, ops)
     ops = apply_commutation(atom_list, ops)
     ops = replace_bdb(atom_list, ops)
-
     ops = reduce_options(atom_list, ops)
     list_print(ops)
     
@@ -922,8 +922,8 @@ def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,e
 
         zvals = np.zeros(len(rad_list))
         for tau in tau_list:
-            mapper = Pyro.core.getProxyForURI("PYRONAME://:Mapper.dispatcher")
-            vals = mapper.map(sph,(rad_list,[wt],tau,same_args))
+            pool = Mapper()
+            vals = pool.map(sph,(rad_list,[wt],tau,same_args))
             print 'actual result',vals
             vals = np.array(vals)
             zvals = zvals + vals
@@ -937,11 +937,12 @@ def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,e
             CS = plt.contourf(xi,yi,zi,15,cmap=plt.cm.jet)
             plt.colorbar()
             plt.show()
-    res_array = np.array(wt_temp)
+    res_array = np.array(wt_temp.T)
     print res_array
     return rad_list,wt_list,res_array
 
 #---------------- MAIN --------------------------------------------------------- 
+
 
 if __name__=='__main__':
     from csection import spherical_averaging as sph
@@ -949,7 +950,7 @@ if __name__=='__main__':
     file_pathname = os.path.abspath('')
     interfile = os.path.join(file_pathname,r'montecarlo.txt')
     spinfile = os.path.join(file_pathname,r'spins.txt')
-
+    
     atom_list, jnums, jmats,N_atoms_uc=readFiles(interfile,spinfile)
     
     N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wt_list,fflist = run_cross_section(interfile,spinfile)

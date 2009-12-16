@@ -33,7 +33,7 @@ import traceback
 
 
 # set-up logging
-#logger = logging.getLogger('Mapper')
+logger = logging.getLogger('Mapper')
 
 # Item pushed on the input queue to tell the worker process to terminate
 SENTINEL = "QUIT"
@@ -88,45 +88,38 @@ class Mapper(object):
         *v* iterable
         """
         self.func = f
-        self.data = v
         
+        self.data = v
+        #self.d = zip(self.data[0], self.data[1])
         self.p = self.data[0]
+        print 'first list', self.p
         self.q = self.data[1]
+        print 'second list', self.q
         self.r = self.data[2]
         self.arg = self.data[3]
-        
-        if len(self.workers)>0:
-            chunksize, extra = divmod(len(self.p), len(self.workers)*4)
-            if extra:
-                chunksize += 1
-        else:
-            print ('No worker available')
-            pass
-        
+        print 'list', self.arg
         argindex = 0
         self.outlist = [None]*len(self.p) 
-        
-        iter_element = iter(self.p)
         exit_loop = False
         chunk = []
-        while not exit_loop:
-            seq = []
-            for i in xrange(chunksize or 1):
-                try:
-                    args = iter_element.next()
-                    #print 'arg', args
-                except StopIteration:
-                    exit_loop = True
-                    break
-                job = Map_job(self.func, argindex,args,self.q[0],self.r,self.arg)
-                argindex += 1
-                seq.append(job)
+        seq = []
+        for i in range (len(self.p)):
+            job = Map_job(self.func, argindex,self.p[i],self.q[0],self.r,self.arg)
+            argindex += 1
+            seq.append(job)
+        #print self.func, self.data, self.d
+        
+#        seq = []
+#        for i in self.d:
+#            job = Map_job(self.func, argindex, i[0],i[1],self.arg)
+#            argindex += 1
+#            seq.append(job)
                 
-            chunk.append(Map_chunk(seq))
-
+        chunk.append(Map_chunk(seq))
+        
         for seq in chunk:
             self.add_mapjob(seq)
-        
+
         result = self.collect_work()
         return result
     
@@ -278,7 +271,7 @@ class Map_job(WorkUnit):
         """
         try:
             self._result = self.func(self.x,self.y,self.z,*self.arg)
-            #print 'result', self._result
+            print 'result', self._result
         except:
             self._exc_info = traceback.format_exc()
         else:
@@ -384,20 +377,16 @@ class Worker(multiprocessing.Process):
             # process blocks here if outputQueue is full
             self.outputQueue.put(job)
             
-def func(y,x,z,*args):
-    print 'x',x
-    print 'y',y
-    print 'z',z
+def func(y,x,*args):
     return x*y        
 
 if __name__=='__main__':
    
     x = [1,2,3]
     y = [4,5,6]
-    z = [7,8,9]
     arg = ['alpha','beta',7,8]
     pool = Mapper()
-    result = pool.map(func, (x,y,z,arg))
+    result = pool.map(func, (x,y,arg))
     print 'result', result
     pool.terminate()
     pool.join()

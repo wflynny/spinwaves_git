@@ -23,6 +23,14 @@ from scipy.integrate import dblquad, simps
 from timeit import default_timer as time
 
 if 1:
+    x = np.array([1,2,3,4])
+    y = np.array([1,2,3,4])
+    z = np.array([1,2,3,4])
+
+    newarr = np.array([x,y,z])
+    newarr.tofile(r'c:/myfile.txt', sep=' ', format = "%e")
+    
+if 0:
 
     def chop(expr,tol=1e-8):
         for item in expr.atoms():
