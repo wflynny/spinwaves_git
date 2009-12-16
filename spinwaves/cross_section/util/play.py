@@ -5,7 +5,7 @@ from matplotlib._pylab_helpers import Gcf
 import sympy as sp
 #from sympy import oo,I,cos,sin,exp
 import numpy as np
-from numpy import sin, cos, exp, pi
+from numpy import sin, cos, exp, pi, newaxis
 import scipy as sci
 from scipy.integrate import quad, inf
 from scipy.sparse import bsr_matrix
@@ -21,8 +21,70 @@ import matplotlib.pyplot as plt
 import spinwaves.spinwavecalc.readfiles as rf
 from scipy.integrate import dblquad, simps
 from timeit import default_timer as time
+from spinwaves.cross_section.csection_calc import plot_cross_section
+
+if 0:
+    def func(x,y):
+        temparr=[]
+        for i in x:
+            temparr1=[]
+            for j in y:
+                temparr1.append(j)
+            temparr.append(temparr1)
+        return np.array(temparr)
+        
+    a = np.linspace(0,100,5)
+    b = np.linspace(0,10,5)
+    c = func(a,b)
+    file_pathname = os.path.abspath('')
+    np.save(os.path.join(file_pathname,r'myfilea.txt'),a)
+    np.save(os.path.join(file_pathname,r'myfileb.txt'),b)
+    np.save(os.path.join(file_pathname,r'myfilec.txt'),c)
+    
+    newa = np.load(os.path.join(file_pathname,r'myfilea.txt.npy'))
+    newb = np.load(os.path.join(file_pathname,r'myfileb.txt.npy'))
+    newc = np.load(os.path.join(file_pathname,r'myfilec.txt.npy'))
+
+
+if 0:
+    csfilestr = 'c:\myfile.txt'
+    csfile = open(csfilestr,'r')
+    arr = []
+    myFlag=1
+    while myFlag:
+        tokenized = rf.get_tokenized_line(csfile)
+        if not(tokenized) or tokenized==[]:
+            break
+        mytokens = [float(ele) for ele in tokenized]
+        arr.append(mytokens)
+    csoutput = np.array(arr)
+    plot_cross_section(csoutput[0],csoutput[1],csoutput[2])
 
 if 1:
+    Sval = 1.0
+    xval = 1.0
+    yval = 2.0
+    zval = 3.0
+    Svals = [1.0]
+    xvals = np.linspace(0,1,20)
+    yvals = np.linspace(0,1,20)
+    zvals = np.linspace(0,1,20)
+    
+    S,kx,ky,kz = sp.Symbol('S'), sp.Symbol('kx'), sp.Symbol('ky'), sp.Symbol('kz')
+    expr = -9.3817880536803e-6*S*sp.sin(kx) + (-127.999936536715*S**2*sp.cos(kx) + 63.9999576913864*S**2 + 63.9999788453292*S**2*sp.cos(kx)**2)**(1./2.)/2.
+    expr2 = -9.3817880536803e-6*sp.sin(kx) + 1e-99*kz + 1e-99*ky +(-127.999936536715*sp.cos(kx) + 63.9999576913864 + 63.9999788453292*sp.cos(kx)**2)**(1./2.)/2.
+
+    
+    expr_np = sp.lambdify((S,kx,ky,kz), expr, modules = "numpy")
+    expr_np2 = sp.lambdify((kx,ky,kz), expr2, modules = "numpy")
+
+    #res_np = expr_np(Svals[:,newaxis,newaxis,newaxis],xvals[newaxis,:,newaxis,newaxis],yvals[newaxis,newaxis,:,newaxis],zvals[newaxis,newaxis,newaxis,:])
+    res_np2 = expr_np2(xvals[:,newaxis,newaxis],yvals[newaxis,:,newaxis],zvals[newaxis,newaxis,:])
+    
+    print res_np2
+    
+    
+if 0:
     x = np.array([1,2,3,4])
     y = np.array([1,2,3,4])
     z = np.array([1,2,3,4])

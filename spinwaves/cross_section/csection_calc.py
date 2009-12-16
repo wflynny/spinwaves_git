@@ -8,12 +8,12 @@ from sympy.physics.paulialgebra import delta
 import numpy as np
 from scipy.integrate import simps
 
-import matplotlib
-matplotlib.use('WXAgg')
-import pylab
-from matplotlib._pylab_helpers import Gcf
-import matplotlib.ticker as ticker
-import matplotlib.pyplot as plt
+#import matplotlib
+#matplotlib.use('WXAgg')
+#import pylab
+#from matplotlib._pylab_helpers import Gcf
+#import matplotlib.ticker as ticker
+#import matplotlib.pyplot as plt
 
 from spinwaves.cross_section.util.subin import sub_in
 from spinwaves.spinwavecalc.readfiles import atom, readFiles
@@ -463,8 +463,10 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     print 'intermediate'
     print csection
 #    csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),(1./hbar)*sp.DiracDelta(A + B)*sp.simplify(sp.DiracDelta(C + D  - tau)))  #This is correct
-    csection = sub_in(csection,sp.DiracDelta(A_WILD*T_SYM + B_WILD*T_SYM + C_WILD*L_SYM + D_WILD*L_SYM ),sp.Pow(pi,-1)*(LIFETIME_VALUE*0.5)*sp.Pow((A_WILD+B_WILD)**2+(LIFETIME_VALUE*0.5)**2,-1)*sp.simplify(sp.DiracDelta(C_WILD + D_WILD  - TAU_SYM)))
-    print 'ending'
+    csection = sub_in(csection,sp.DiracDelta(A_WILD*T_SYM + B_WILD*T_SYM + C_WILD*L_SYM + D_WILD*L_SYM ),
+                      sp.Pow(pi,-1)*(LIFETIME_VALUE*0.5)*sp.Pow((A_WILD+B_WILD)**2+(LIFETIME_VALUE*0.5)**2,-1)*sp.Pow(pi,-1)*(LIFETIME_VALUE*0.5)*sp.Pow((C_WILD + D_WILD  - TAU_SYM)**2+(LIFETIME_VALUE*0.5)**2,-1))
+    #csection = sub_in(csection,sp.DiracDelta(A_WILD*T_SYM + B_WILD*T_SYM + C_WILD*L_SYM + D_WILD*L_SYM ),
+    #                  sp.Pow(pi,-1)*(LIFETIME_VALUE*0.5)*sp.Pow((A_WILD+B_WILD)**2+(LIFETIME_VALUE*0.5)**2,-1)*sp.simplify(sp.DiracDelta(C_WILD + D_WILD  - TAU_SYM)))    print 'ending'
     print csection
     
     # Do some associative clean up to make it easier for later substitutions
@@ -900,6 +902,7 @@ def run_eval_cross_section(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvec
 def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,eig_list,wt_list,temperature):
 #    theta_list=[]
 #    phi_list=[]
+    mapper = Pyro.core.getProxyForURI("PYRONAME://:Mapper.dispatcher")
     rad_list=[]
     for kappa in kapvect:
         kx,ky,kz = kappa[0],kappa[1],kappa[2]
@@ -922,7 +925,6 @@ def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,e
 
         zvals = np.zeros(len(rad_list))
         for tau in tau_list:
-            mapper = Pyro.core.getProxyForURI("PYRONAME://:Mapper.dispatcher")
             vals = mapper.map(sph,(rad_list,[wt],tau,same_args))
             print 'actual result',vals
             vals = np.array(vals)
@@ -941,10 +943,9 @@ def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,e
     print res_array
     return rad_list,wt_list,res_array
 
-#---------------- MAIN --------------------------------------------------------- 
 
-if __name__=='__main__':
-    from csection import spherical_averaging as sph
+def primary_driver():
+    #from csection import spherical_averaging as sph
 
     file_pathname = os.path.abspath('')
     interfile = os.path.join(file_pathname,r'montecarlo.txt')
@@ -973,7 +974,13 @@ if __name__=='__main__':
     
     x,y,z=run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,eig_list,wt_list,temperature)
     newarr = np.array([x,y,z])
-    newarr.tofile(r'c:/myfile.txt', sep=' ', format = "%e")
+    #newarr.tofile(os.path.join(file_pathname,r'myfile.txt'), sep=' ', format = "%e")
+    np.save(os.path.join(file_pathname,r'myfile.txt'),newarr)
+
+#---------------- MAIN --------------------------------------------------------- 
+
+
+
     #plot_cross_section(x,y,z)
     
 #    for h,k,l in zip(h_list,k_list,l_list):
