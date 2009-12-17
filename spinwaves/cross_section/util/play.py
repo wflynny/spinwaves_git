@@ -1,13 +1,15 @@
 import matplotlib
 matplotlib.use('WXAgg')
 import pylab
+import matplotlib.pyplot as plt
 from matplotlib._pylab_helpers import Gcf
 import sympy as sp
 #from sympy import oo,I,cos,sin,exp
 import numpy as np
-from numpy import sin, cos, exp, pi, newaxis
+from numpy import sin, cos, exp, pi
+from numpy import newaxis as nax
 import scipy as sci
-from scipy.integrate import quad, inf
+from scipy.integrate import quad, inf, dblquad, simps, composite, cumtrapz
 from scipy.sparse import bsr_matrix
 import sys
 from scipy.optimize.slsqp import approx_jacobian
@@ -19,31 +21,75 @@ from printing import *
 from multiprocessing import Process, Lock
 import matplotlib.pyplot as plt
 import spinwaves.spinwavecalc.readfiles as rf
-from scipy.integrate import dblquad, simps
 from timeit import default_timer as time
 from spinwaves.cross_section.csection_calc import plot_cross_section
 
 if 0:
-    def func(x,y):
-        temparr=[]
-        for i in x:
-            temparr1=[]
-            for j in y:
-                temparr1.append(j)
-            temparr.append(temparr1)
-        return np.array(temparr)
-        
-    a = np.linspace(0,100,5)
-    b = np.linspace(0,10,5)
-    c = func(a,b)
-    file_pathname = os.path.abspath('')
-    np.save(os.path.join(file_pathname,r'myfilea.txt'),a)
-    np.save(os.path.join(file_pathname,r'myfileb.txt'),b)
-    np.save(os.path.join(file_pathname,r'myfilec.txt'),c)
+    x,y,z = sp.symbols('xyz')
+    exprs = [x+y,x*x+y*y,x*x*x+y*y*y]
+    xx = np.linspace(0,1,3)
+    yy = xx
+    zz = xx
     
-    newa = np.load(os.path.join(file_pathname,r'myfilea.txt.npy'))
-    newb = np.load(os.path.join(file_pathname,r'myfileb.txt.npy'))
-    newc = np.load(os.path.join(file_pathname,r'myfilec.txt.npy'))
+    func = sp.lambdify((x,y),exprs,modules="numpy")
+    np_func = func(xx[:,nax],xx[nax,:])
+    for ele in np_func:
+        print ele
+    print np.sum(np_func,axis=0)
+
+if 0:
+    thetas = np.linspace(0,np.pi,25) 
+    phis = np.linspace(0,2*np.pi,25)
+    def func(t,p):
+        return np.array([[np.tanh(phi)*np.tanh(the) for phi in p] for the in t])
+    temp_cs = func(thetas,phis)
+    print 'z',temp_cs
+
+    partial_res=[]
+    for i in range(len(thetas)):
+        single_res = simps(temp_cs[i],phis)
+        partial_res.append(single_res)
+    total_res = simps(partial_res,thetas)
+    print 'res',total_res
+    
+    def func2(t,p):
+        return np.tanh(t)*np.tanh(p)
+    pL = lambda t: 0
+    pU = lambda t: np.pi
+    print 'dblquad',dblquad(func2,0,2*np.pi,pL,pU)
+
+if 0:
+    expr = 0
+    num = 5
+    for i in range(num):
+        nq = sp.Symbol('n%i'%(i,))
+        expr += nq
+    print expr
+    npx = np.array([expr])
+    print npx
+    print npx.shape
+
+if 1:
+    thetas = np.linspace(0,np.pi,26) 
+    phis = np.linspace(0,2*np.pi,25)
+
+    val_func = lambda t,p: 1
+    cs_vals = np.array([[val_func(t,p) for p in phis] for t in thetas])
+    
+    print cs_vals.shape
+
+    file_pathname = os.path.abspath('')
+    print file_pathname
+    x = np.load(os.path.join(file_pathname,'myfilex.txt.npy'))
+    y = np.load(os.path.join(file_pathname,'myfiley.txt.npy'))
+    z = np.load(os.path.join(file_pathname,'myfilez.txt.npy'))
+
+    print x.shape
+    print y.shape
+    print z.shape
+    
+    plt.contourf(x,y,z)
+    plt.show()
 
 
 if 0:
@@ -60,15 +106,15 @@ if 0:
     csoutput = np.array(arr)
     plot_cross_section(csoutput[0],csoutput[1],csoutput[2])
 
-if 1:
+if 0:
     Sval = 1.0
     xval = 1.0
     yval = 2.0
     zval = 3.0
     Svals = [1.0]
-    xvals = np.linspace(0,1,20)
-    yvals = np.linspace(0,1,20)
-    zvals = np.linspace(0,1,20)
+    xvals = np.linspace(0,1,5)
+    yvals = np.linspace(0,1,5)
+    zvals = np.linspace(0,1,5)
     
     S,kx,ky,kz = sp.Symbol('S'), sp.Symbol('kx'), sp.Symbol('ky'), sp.Symbol('kz')
     expr = -9.3817880536803e-6*S*sp.sin(kx) + (-127.999936536715*S**2*sp.cos(kx) + 63.9999576913864*S**2 + 63.9999788453292*S**2*sp.cos(kx)**2)**(1./2.)/2.
@@ -79,9 +125,13 @@ if 1:
     expr_np2 = sp.lambdify((kx,ky,kz), expr2, modules = "numpy")
 
     #res_np = expr_np(Svals[:,newaxis,newaxis,newaxis],xvals[newaxis,:,newaxis,newaxis],yvals[newaxis,newaxis,:,newaxis],zvals[newaxis,newaxis,newaxis,:])
-    res_np2 = expr_np2(xvals[:,newaxis,newaxis],yvals[newaxis,:,newaxis],zvals[newaxis,newaxis,:])
+    res_np = expr_np(sp.Symbol('S'),xvals[:,nax,nax],yvals[nax,:,nax],zvals[nax,nax,:])
     
-    print res_np2
+    print res_np.shape
+    
+    exprs = [expr,expr]
+    res_sym = sp.lambdify((S,kx,ky,kz),exprs)
+    print res_sym(1,np.pi,np.pi,np.pi)
     
     
 if 0:

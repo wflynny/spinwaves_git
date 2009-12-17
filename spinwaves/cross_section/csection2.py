@@ -680,7 +680,14 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     #csectempm = deepcopy(csection)  #good             
     
     csectempp = copy(csection)  #good
-    csectempm = copy(csection)  #good   
+    csectempm = copy(csection)  #good
+    
+    
+    cs_expr = sp.lambdify((KAP_SYM,Q_SYM,TAU_SYM,W_SYM,WQ_SYM,KAPXHAT_SYM,KAPYHAT_SYM,KAPZHAT_SYM), expr2, modules = "numpy")
+
+    #res_np = expr_np(Svals[:,newaxis,newaxis,newaxis],xvals[newaxis,:,newaxis,newaxis],yvals[newaxis,newaxis,:,newaxis],zvals[newaxis,newaxis,newaxis,:])
+    res_np2 = expr_np2(xvals[:,newaxis,newaxis],yvals[newaxis,:,newaxis],zvals[newaxis,newaxis,:])
+    
     
     csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(1))
     csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(0))
@@ -701,6 +708,8 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
         eigcsecp=copy(csectempp)  #good
         eigcsecm=copy(csectempm)
         eigtemp = copy(eig_list[0][eigi])
+        eig_expr = sp.lambdify((S_SYM,KX_SYM,KY_SYM,KZ_SYM), sp.abs(eigtemp))#, modules = "numpy")
+        eigval = eig_expr(S(1.0),kap[0],kap[1],kap[2]).evalf(chop=True)
 
         eigtemp = eigtemp.subs(S_SYM, sp.S(1.0))
         eigtemp = eigtemp.subs(KX_SYM, kap[0])
