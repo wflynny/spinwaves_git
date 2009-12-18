@@ -25,6 +25,25 @@ from timeit import default_timer as time
 from spinwaves.cross_section.csection_calc import plot_cross_section
 
 if 0:
+    ts = ['t%i'%i for i in range(5)]
+    ps = ['p%i'%i for i in range(5)]
+    arr = np.array([[t+p for p in ps] for t in ts])
+    print arr
+    print arr[0]
+
+if 0:
+    ff = 0
+    el = elements[26]
+    val = 3
+    if val != None:
+        Mq = el.magnetic_ff[val].M_Q(1)
+    else:
+        Mq = el.magnetic_ff[0].M_Q(1)
+    ff = Mq
+    
+    print ff
+
+if 1:
     x,y,z = sp.symbols('xyz')
     exprs = [x+y,x*x+y*y,x*x*x+y*y*y]
     xx = np.linspace(0,1,3)
@@ -79,10 +98,13 @@ if 1:
     print cs_vals.shape
 
     file_pathname = os.path.abspath('')
-    print file_pathname
-    x = np.load(os.path.join(file_pathname,'myfilex.txt.npy'))
-    y = np.load(os.path.join(file_pathname,'myfiley.txt.npy'))
-    z = np.load(os.path.join(file_pathname,'myfilez.txt.npy'))
+
+#    x = np.load(os.path.join(file_pathname,'myfilex.txt.npy'))
+#    y = np.load(os.path.join(file_pathname,'myfiley.txt.npy'))
+#    z = np.load(os.path.join(file_pathname,'myfilez.txt.npy'))
+    x = np.load(os.path.join(file_pathname,'testx.txt.npy'))
+    y = np.load(os.path.join(file_pathname,'testy.txt.npy'))
+    z = np.load(os.path.join(file_pathname,'testz.txt.npy'))
 
     print x.shape
     print y.shape

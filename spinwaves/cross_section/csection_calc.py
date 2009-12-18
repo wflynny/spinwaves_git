@@ -1,20 +1,19 @@
-#import sys
+import sys
 import os
-
+#sys.path.append(r"/home/npatel/python_code/spinwaves_git")
 import sympy as sp
 import sympy.matrices as spm
 from sympy import I,pi,exp,oo,sqrt
 from sympy.physics.paulialgebra import delta
 import numpy as np
 from scipy.integrate import simps
-from numpy import newaxis as nax
 
-#import matplotlib
-#matplotlib.use('WXAgg')
-#import pylab
-#from matplotlib._pylab_helpers import Gcf
-#import matplotlib.ticker as ticker
-#import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('WXAgg')
+import pylab
+from matplotlib._pylab_helpers import Gcf
+import matplotlib.ticker as ticker
+import matplotlib.pyplot as plt
 
 from spinwaves.cross_section.util.subin import sub_in
 from spinwaves.spinwavecalc.readfiles import atom, readFiles
@@ -52,8 +51,8 @@ TAU_SYM = sp.Symbol('tau', real = True) # tau
 KX_SYM = sp.Symbol('kx', real = True)
 KY_SYM = sp.Symbol('ky', real = True)
 KZ_SYM = sp.Symbol('kz', real = True)
-KTPQ_SYM = sp.Symbol('ktpq', real = True)
-KTMQ_SYM = sp.Symbol('ktmq', real = True)
+DD_KTPQ_SYM = sp.Symbol('DD(KT+P)', real = True)
+DD_KTMQ_SYM = sp.Symbol('DD(KT-P)', real = True)
 
 KAPXHAT_SYM = sp.Symbol('kapxhat',real=True)
 KAPYHAT_SYM = sp.Symbol('kapyhat',real=True)
@@ -222,7 +221,6 @@ def generate_possible_combinations(atom_list, alist):
             allzerolist = [alista[i][0].subs(L_SYM,0) for k in range(len(alista[i])-1)]+[delta-vect1*vect2]
             otherlist = [alist[j][k].subs(Q_SYM,QP_SYM).subs(WQ_SYM,WQP_SYM) for k in range(len(alist[j])-1)]+[1]
             append_list = list_mult(allzerolist,otherlist)
-            print 'here',append_list
             op_list.append(append_list)
     print "Generated: Possible Operator Combinations"
     return op_list
@@ -398,7 +396,6 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
         unit_vect.append(arg[i].pop())
     #print unit_vect
     unit_vect = sum(unit_vect)
-    print unit_vect
 
     # Generate qs from kappas and taus
     qlist=[]
@@ -420,7 +417,6 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
 
     eigs = Hsave.eigenvals().keys()
     for q in qlist:
-        print eigs
         eig_list.append(eigs)
     eig_list = np.array(eig_list)
     print "Calculated: Eigenvalues"
@@ -460,28 +456,24 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     csection = (csection * exp(-I * W_SYM * T_SYM) * exp(I * KAP_SYM * L_SYM)).expand(deep=False)
     csection = sp.powsimp(csection, deep=True)
     print 'beginning'
-    print csection
+#    print csection
     csection = sp.powsimp(csection)
     csection = sub_in(csection,exp(I*T_SYM*A_WILD + I*T_SYM*B_WILD + I*C_WILD + I*D_WILD + I*K_WILD),sp.DiracDelta(A_WILD*T_SYM + B_WILD*T_SYM + C_WILD + D_WILD + K_WILD))
     print 'intermediate'
-    print csection
+#    print csection
 #    csection = sub_in(csection,sp.DiracDelta(A*t + B*t + C*L + D*L ),(1./hbar)*sp.DiracDelta(A + B)*sp.simplify(sp.DiracDelta(C + D  - tau)))  #This is correct
-    csection = sub_in(csection,sp.DiracDelta(A_WILD*T_SYM + B_WILD*T_SYM + C_WILD*L_SYM + D_WILD*L_SYM ),
-                      sp.Pow(pi,-1)*(LIFETIME_VALUE*0.5)*sp.Pow((A_WILD+B_WILD)**2+(LIFETIME_VALUE*0.5)**2,-1)*sp.Pow(pi,-1)*(LIFETIME_VALUE*0.5)*sp.Pow((C_WILD + D_WILD  - TAU_SYM)**2+(LIFETIME_VALUE*0.5)**2,-1))
-    #csection = sub_in(csection,sp.DiracDelta(A_WILD*T_SYM + B_WILD*T_SYM + C_WILD*L_SYM + D_WILD*L_SYM ),
-    #                  sp.Pow(pi,-1)*(LIFETIME_VALUE*0.5)*sp.Pow((A_WILD+B_WILD)**2+(LIFETIME_VALUE*0.5)**2,-1)*sp.simplify(sp.DiracDelta(C_WILD + D_WILD  - TAU_SYM)))    print 'ending'
-    print csection
+    csection = sub_in(csection,sp.DiracDelta(A_WILD*T_SYM + B_WILD*T_SYM + C_WILD*L_SYM + D_WILD*L_SYM ),sp.Pow(pi,-1)*(LIFETIME_VALUE*0.5)*sp.Pow((A_WILD+B_WILD)**2+(LIFETIME_VALUE*0.5)**2,-1)*sp.simplify(sp.DiracDelta(C_WILD + D_WILD  - TAU_SYM)))
+    print 'ending'
+#    print csection
     
     # Do some associative clean up to make it easier for later substitutions
     csection = sub_in(csection,sp.DiracDelta(-A_WILD - B_WILD),sp.DiracDelta(A_WILD + B_WILD))
     csection = sub_in(csection,(-A_WILD - B_WILD)**2,(A_WILD + B_WILD)**2)
     csection = csection.subs(sp.DiracDelta(Q_SYM + TAU_SYM - KAP_SYM),sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM))
     csection = csection.subs(sp.DiracDelta(TAU_SYM - KAP_SYM - Q_SYM),sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM))
-    
-    csection = csection.subs((Q_SYM + TAU_SYM - KAP_SYM),(KAP_SYM - Q_SYM - TAU_SYM))
-    csection = csection.subs((TAU_SYM - KAP_SYM - Q_SYM),(KAP_SYM + Q_SYM - TAU_SYM))
-    csection = csection.subs((KAP_SYM - Q_SYM - TAU_SYM),(KTMQ_SYM))
-    csection = csection.subs((KAP_SYM + Q_SYM - TAU_SYM),(KTPQ_SYM))
+
+    csection = csection.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),DD_KTMQ_SYM)
+    csection = csection.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),DD_KTPQ_SYM)
     print "Applied: Delta Function Conversion"
     
     print csection
@@ -515,10 +507,7 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     temperature = temperature
     front_constant = ((GAMMA_R0_VALUE**2)*DEBYE_WALLER_VALUE/(2*pi*HBAR_VALUE)).evalf() #(gamr0)**2#/(2*pi*hbar)
     print front_constant
-
-#    cs_expr = sp.lambdify((KTPQ_SYM,KTMQ_SYM,TAU_SYM,W_SYM,WQ_SYM,KAPXHAT_SYM,KAPYHAT_SYM,KAPZHAT_SYM), expr2, modules = "numpy")
-#    csplus = cs_expr((kapvect))
-
+    
     # kappa, omegas, tau, eigs
     temp1 = []
     for kapi in range(len(kapvect)):
@@ -528,32 +517,24 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
             for taui in range(len(tau_list)):
                 print 'k,w,t',kapi,wi,taui
                 ws=[]
-                
-                
-             
-#                qplus = kapvect[kapi] - tau_list[taui]
-#                qmins = tau_list[taui] - kapvect[kapi]
 
-                csectempp = deepcopy(csection)
-                csectempm = deepcopy(csection)                    
+                #qplus = kapvect[kapi] + tau_list[taui]
+                #qmins = tau_list[taui] - kapvect[kapi]
 
-#                qvalp = kapvect[kapi] - tau_list[taui] + qmins
-#                qvalm = kapvect[kapi] - tau_list[taui] - qplus
-#                qvalp = lattice.modvec(qvalp[0],qvalp[1],qvalp[2], 'latticestar')
-#                qvalm = lattice.modvec(qvalm[0],qvalm[1],qvalm[2], 'latticestar')
-#
-#                csectempp = csectempp.subs(KAP_SYM - Q_SYM - TAU_SYM,qvalm)
-#                csectempp = csectempp.subs(KAP_SYM + Q_SYM - TAU_SYM,qvalp)
-#                csectempm = csectempm.subs(KAP_SYM - Q_SYM - TAU_SYM,qvalm)
-#                csectempm = csectempm.subs(KAP_SYM + Q_SYM - TAU_SYM,qvalp)
+                csectempp = copy(csection)
+                csectempm = copy(csection)                    
+
+                #qvalp = kapvect[kapi] - tau_list[taui] + qmins
+                #qvalm = kapvect[kapi] - tau_list[taui] - qplus
+
+                csectempp = csectempp.subs(DD_KTMQ_SYM,sp.S(1))
+                csectempp = csectempp.subs(DD_KTPQ_SYM,sp.S(0))
+                csectempm = csectempm.subs(DD_KTMQ_SYM,sp.S(0))
+                csectempm = csectempm.subs(DD_KTPQ_SYM,sp.S(1))
 #                csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(1))
 #                csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(0))
 #                csectempm = csectempm.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(0))
 #                csectempm = csectempm.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(1))
-                csectempp = csectempp.subs((KAP_SYM - Q_SYM - TAU_SYM),sp.S(1))
-                csectempp = csectempp.subs((KAP_SYM + Q_SYM - TAU_SYM),sp.S(0))
-                csectempm = csectempm.subs((KAP_SYM - Q_SYM - TAU_SYM),sp.S(0))
-                csectempm = csectempm.subs((KAP_SYM + Q_SYM - TAU_SYM),sp.S(1))
 #                print 'm'
 #                print csectempm
 #                print 'p'
@@ -567,14 +548,14 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
                 csectempm = csectempm.subs(KAPZHAT_SYM,kapunit[kapi,2])
 
                 for eigi in range(len(eig_list[taui])):
-                    eigcsecp=deepcopy(csectempp)
-                    eigcsecm=deepcopy(csectempm)
+                    eigcsecp=copy(csectempp)
+                    eigcsecm=copy(csectempm)
 
 #                    print 'a'
 #                    print eigcsecp
 #                    print eigcsecm
 
-                    eigtemp = deepcopy(eig_list[0][eigi])
+                    eigtemp = copy(eig_list[0][eigi])
 
 #                    print 'eig', eigtemp
 
@@ -633,10 +614,10 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
 #                        eigcsecp = eigcsecp.subs(sp.DiracDelta(w + wq), sp.S(0))
 #                        eigcsecm = eigcsecm.subs(sp.DiracDelta(wq + w), sp.S(0))                                        
 #
-                    print 'p'
-                    print eigcsecp
-                    print 'm'
-                    print eigcsecm
+#                    print 'p'
+#                    print eigcsecp
+#                    print 'm'
+#                    print eigcsecm
 
                     # eief == True => ei=efixed
                     # eief == False => ef=efixed
@@ -666,7 +647,7 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
     
     #Multiply by Form Factor
     print fflist.shape
-    csdata = G*fflist*csdata
+    csdata = G_VALUE*fflist*csdata
 
     return kapvect, wtlist, csdata
 
@@ -688,16 +669,14 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     ky = rad*np.sin(theta)*np.sin(phi)
     kz = rad*np.cos(theta)
     kap = np.array([kx,ky,kz])
+#    print kx, ky, kz
 
-    kapunit = kap.copy()
-    kapunit[0]=kap[0]/rad
-    kapunit[1]=kap[1]/rad
-    kapunit[2]=kap[2]/rad    
+#    kapunit = kap.copy()
+#    kapunit[0]=kap[0]/rad
+#    kapunit[1]=kap[1]/rad
+#    kapunit[2]=kap[2]/rad    
 
     ws=[]
-
-#    cs_expr = sp.lambdify((KTPQ_SYM,KTMQ_SYM,TAU_SYM,W_SYM,WQ_SYM,KAPXHAT_SYM,KAPYHAT_SYM,KAPZHAT_SYM), expr2, modules = "numpy")
-#    csplus = cs_expr((kapvect))
 
     #csectempp = deepcopy(csection)  #good
     #csectempm = deepcopy(csection)  #good             
@@ -705,56 +684,65 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     csectempp = copy(csection)  #good
     csectempm = copy(csection)  #good   
 
-    qplus = kapvect[kapi] - tau_list[taui]
-    qmins = tau_list[taui] - kapvect[kapi]
+    csectempp = csectempp.subs(DD_KTMQ_SYM,sp.S(1))
+    csectempp = csectempp.subs(DD_KTPQ_SYM,sp.S(0))
+    csectempm = csectempm.subs(DD_KTMQ_SYM,sp.S(0))
+    csectempm = csectempm.subs(DD_KTPQ_SYM,sp.S(1))
 
 #    csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(1))
 #    csectempp = csectempp.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(0))
 #    csectempm = csectempm.subs(sp.DiracDelta(KAP_SYM - Q_SYM - TAU_SYM),sp.S(0))
 #    csectempm = csectempm.subs(sp.DiracDelta(KAP_SYM + Q_SYM - TAU_SYM),sp.S(1))
-    csectempp = csectempp.subs(KTPQ_SYM,sp.S(1))
-    csectempp = csectempp.subs(KTPQ_SYM,sp.S(0))
-    csectempm = csectempm.subs(KTPQ_SYM,sp.S(0))
-    csectempm = csectempm.subs(KTPQ_SYM,sp.S(1))
 
-    csectempp = csectempp.subs(KAPXHAT_SYM,kapunit[0])
-    csectempp = csectempp.subs(KAPYHAT_SYM,kapunit[1])
-    csectempp = csectempp.subs(KAPZHAT_SYM,kapunit[2])
-    csectempm = csectempm.subs(KAPXHAT_SYM,kapunit[0])
-    csectempm = csectempm.subs(KAPYHAT_SYM,kapunit[1])
-    csectempm = csectempm.subs(KAPZHAT_SYM,kapunit[2])
+    csectempp = csectempp.subs(KAPXHAT_SYM,kap[0]/rad)
+    csectempp = csectempp.subs(KAPYHAT_SYM,kap[1]/rad)
+    csectempp = csectempp.subs(KAPZHAT_SYM,kap[2]/rad)
+    csectempm = csectempm.subs(KAPXHAT_SYM,kap[0]/rad)
+    csectempm = csectempm.subs(KAPYHAT_SYM,kap[1]/rad)
+    csectempm = csectempm.subs(KAPZHAT_SYM,kap[2]/rad)
 
-    eigstart = clock()
-    eig_func = sp.lambdify((S_SYM,KX_SYM,KY_SYM,KZ_SYM),eig_list[0],modules="numpy")
-    eigens = np.abs(np.array(eig_func(sp.S(1,0),kx,ky,kz)))
-    eigend = clock()
-#    print 'eig time', eigend-eigstart
 
-#    for eigi in range(len(eig_list)):
-    for eigval in eigens:
+
+#    eig_list = eig_list[0].tolist()
+#    eig_func = sp.lambdify((S_SYM,KX_SYM,KY_SYM,KZ_SYM),eig_list,modules="numpy")
+#    eigens = np.abs(np.array(eig_func(sp.S(1,0),kx,ky,kz)))
+
+
+
+#    cs_func = sp.lambdify((DD_KTPQ_SYM,DD_KTMQ_SYM,KAPXHAT_SYM,KAPYHAT_SYM,KAPZHAT_SYM,W_SYM,WQ_SYM)
+#                          ,[csection,csection],modules="numpy")
+#    csvals = cs_func([1,0],[0,1],kap[0]/rad,kap[1]/rad,kap[2]/rad,)
+
+
+    
+    for eigi in range(len(eig_list)):
+#    for eigi in eigens:
         #eigcsecp=deepcopy(csectempp)  #good
         #eigcsecm=deepcopy(csectempm)
         #eigtemp = deepcopy(eig_list[0][eigi])
         eigcsecp=copy(csectempp)  #good
         eigcsecm=copy(csectempm)
-#        eigtemp = copy(eig_list[0][eigi])
-#
-#        eigtemp = eigtemp.subs(S_SYM, sp.S(1.0))
-#        eigtemp = eigtemp.subs(KX_SYM, kap[0])
-#        eigtemp = eigtemp.subs(KY_SYM, kap[1])
-#        eigtemp = eigtemp.subs(KZ_SYM, kap[2])
-#        eigtemp = sp.abs(eigtemp.evalf(chop=True)) #works
+        eigtemp = copy(eig_list[0][eigi]) #good
+
+        eigtemp = eigtemp.subs(S_SYM, sp.S(1.0))
+        eigtemp = eigtemp.subs(KX_SYM, kap[0])
+        eigtemp = eigtemp.subs(KY_SYM, kap[1])
+        eigtemp = eigtemp.subs(KZ_SYM, kap[2])
+        eigtemp = sp.abs(eigtemp.evalf(chop=True)) #works
         #eigtemp = chop(np.abs(eigtemp))
 
+#        nval = sp.Pow(sp.exp(eigi/(BOLTZ_VALUE*temperature))-1,-1).evalf() #works
         nval = sp.Pow(sp.exp(eigtemp/(BOLTZ_VALUE*temperature))-1,-1).evalf() #works
         #nval = np.power(np.exp(np.abs(eigtemp)/(BOLTZ*temperature))-1,-1)
         for i in range(N_atoms_uc):
             nq = sp.Symbol('n%i'%(i,), real = True)
             eigcsecp = eigcsecp.subs(nq,nval)
-            eigcsecm = eigcsecm.subs(nq,nval)
+            eigcsecm = eigcsecm.subs(nq,nval) 
 
         wvalp = eigtemp - wt
         wvalm = eigtemp + wt
+#        wvalp = eigi - wt
+#        wvalm = eigi + wt
 
         eigcsecp = eigcsecp.subs((W_SYM - WQ_SYM),wvalp)
         eigcsecp = eigcsecp.subs((W_SYM + WQ_SYM),wvalm)
@@ -770,10 +758,12 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
         kpk = 0.
         if eief == True:
             ei = efixed
+#            ef = ei - eigi
             ef = ei - eigtemp
             kpk = ef/ei
         else:
             ef = efixed
+#            ef = ei + eigi
             ei = ef + eigtemp
             kpk = ef/ei
 
@@ -782,10 +772,10 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     csdata = sp.re(sum(ws))
 
     #Multiply data by front constants
-    csdata = front_constant*csdata
+    csdata = front_constant*G_VALUE*csdata
 
     #Multiply by Form Factor
-    csdata = G_VALUE*csdata
+#    csdata = G_VALUE*csdata
     
     #print kx,'\t\t',ky,'\t\t',kz,'\t\t',csdata
     return csdata#*np.sin(theta)*rad**2
@@ -807,11 +797,13 @@ def spherical_averaging(rad, wt, tau, N_atoms_uc, atom_list, csection, eig_list,
     
     args=(rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt, temperature, eief, efixed)
 
-    theta_test=np.pi/2.0
-    phi_test = np.pi/4.0
-
-    thetas = np.linspace(0,np.pi,25) 
-    phis = np.linspace(0,2*np.pi,25)
+#    theta_test=np.pi/2.0
+#    phi_test = np.pi/4.0
+    
+    if thetas == None:
+        thetas = np.linspace(0,np.pi,25)
+    if phis == None:
+        phis = np.linspace(0,2*np.pi,25)
     cs_vals = []
     partial_res=[]
     
@@ -820,13 +812,11 @@ def spherical_averaging(rad, wt, tau, N_atoms_uc, atom_list, csection, eig_list,
     for i in range(N_atoms_uc):
         el = elements[atom_list[i].atomicNum]
         val = atom_list[i].valence
-        print val
         if val != None:
             Mq = el.magnetic_ff[val].M_Q(rad)
         else:
             Mq = el.magnetic_ff[0].M_Q(rad)
         ff = Mq
-    
 
     start1 = clock()
     val_func = lambda t,p: single_cross_section_calc(t,p,*args)*ff*np.sin(t)*rad**2
@@ -905,7 +895,7 @@ def run_cross_section(interactionfile, spinfile):
     ops = replace_bdb(atom_list, ops)
 
     ops = reduce_options(atom_list, ops)
-    list_print(ops)
+#    list_print(ops)
     
     print "prelims complete. generating cross-section","\n"
 
@@ -928,7 +918,7 @@ def run_cross_section(interactionfile, spinfile):
     (N_atoms_uc,csection,kaprange,
      tau_list,eig_list,kapvect,wtlist,fflist) = generate_cross_section(interactionfile, spinfile, lattice, ops, 
                                                                 tau_list, h_list, k_list, l_list, w_list)
-    print csection
+#    print csection
 
     return N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wtlist,fflist
     end = clock()
@@ -957,26 +947,25 @@ def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,e
         rad_list.append(r)
         
     same_args = (N_atoms_uc, atom_list, csection, eig_list, temperature)
-    wt_temp = []
+    res_array = []
     rand_wt_list = np.append(wt_list[::2],wt_list[1::2])
 #    rand_wt_list = wt_list.copy()
 #    np.random.shuffle(rand_wt_list)
     xvals = np.array(rad_list)
-    xvals = np.array(xvals)
+#    xvals = np.array(xvals)
     yvals = []
     for wt in rand_wt_list:
         yvals.append(wt)
-        
 
-        zvals = np.zeros(len(rad_list))
-        for tau in tau_list:
-            for rad in rad_list:
+        for rad in rad_list:
+            zvals = np.zeros(len(rad_list))
+            for tau in tau_list:
                 vals = spherical_averaging(rad,wt,tau,*same_args)
                 print 'actual result',vals
                 vals = np.array(vals)
                 zvals = zvals + vals
             #val = spherical_averaging(tau, wt, *same_args)
-        wt_temp.append(zvals)
+        res_array.append(zvals)
         
         if 0:
             xi = xvals
@@ -985,14 +974,15 @@ def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,e
             CS = plt.contourf(xi,yi,zi,15,cmap=plt.cm.jet)
             plt.colorbar()
             plt.show()
-    res_array = np.array(wt_temp)
+    res_array = np.array(res_array)
     print res_array
-    return rad_list,wt_list,res_array
+    return xvals,yvals,res_array.T
 
+#---------------- MAIN --------------------------------------------------------- 
 
-#def primary_driver():
-if __name__=="__main__":
-    #from csection import spherical_averaging as sph
+if __name__=='__main__':
+#def pd():
+    #from spinwaves.cross_section.csection_calc import spherical_averaging as sph
 
     file_pathname = os.path.abspath('')
     interfile = os.path.join(file_pathname,r'montecarlo.txt')
@@ -1008,25 +998,52 @@ if __name__=="__main__":
 #    self.process_list.append(p)
 #    p.join()
 #    p.terminate()
-    #kapvect,wtlist,csdata=run_eval_cross_section(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wtlist,fflist)
-    rad = 1.0
-    temperature = 0.0001
-    tau = np.array([0,0,0])
-    wt = np.array(1.0)
-    w_list = np.linspace(-10,10,25)
+
+    # ORIGINAL METHOD TO GENERATE CROSS SECTION
+    if 0:
+        kapvect,wt_list,csdata=run_eval_cross_section(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wt_list,fflist)
+        plot_cross_section(kapvect[:,0],wt_list,csdata)
+
     h_list = np.linspace(0.1,6.3,25)
     k_list = np.zeros(h_list.shape)
     l_list = np.zeros(h_list.shape)
+    w_list = np.linspace(-10,10,25)
+    temperature = 0.0001
     points = []
     
+    # TEST FOR SINGLE_CROSS_SECTION_CALC
+    if 0:
+        rad_list = kaprange
+        theta_list = np.arccos(l_list/rad_list)
+        phi_list = np.arctan2(k_list,h_list)
+        
+        same_args = (N_atoms_uc, atom_list, csection, eig_list, temperature)
+        
+        final_vals=[]
+        for wti in wt_list:
+            inner_vals=[]
+            for i in range(len(rad_list)):
+                inner_vals2=[]
+                for tau in tau_list:
+
+                    val = single_cross_section_calc(theta_list[i], phi_list[i], rad_list[i], N_atoms_uc, atom_list, csection, tau, eig_list, wti,
+                                                     temperature, eief = True, efixed = 14.7)
+                    inner_vals2.append(val)
+                inner_vals.append(sum(inner_vals2))
+            final_vals.append(inner_vals)
+        final_vals = np.array(final_vals)
+
+        plot_cross_section(h_list,wt_list,final_vals)
+
+
+    rad = 1.0
+    tau = np.array([0,0,0])
+    wt = np.array(1.0)
+    
     x,y,z=run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,eig_list,wt_list,temperature)
-    newarr = np.array([x,y,z])
-    #newarr.tofile(os.path.join(file_pathname,r'myfile.txt'), sep=' ', format = "%e")
-    np.save(os.path.join(file_pathname,r'myfile.txt'),newarr)
-
-#---------------- MAIN --------------------------------------------------------- 
-
-
+    np.save(os.path.join(file_pathname,r'myfilex.txt'),x)
+    np.save(os.path.join(file_pathname,r'myfiley.txt'),y)
+    np.save(os.path.join(file_pathname,r'myfilez.txt'),z)
 
     #plot_cross_section(x,y,z)
     
@@ -1049,4 +1066,3 @@ if __name__=="__main__":
     #print csdata
     #plot_cross_section(h_list,wtlist,points)
     #plot_cross_section(kapvect[:,0],wtlist,csdata)
-    
