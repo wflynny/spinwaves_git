@@ -43,7 +43,7 @@ if 0:
     
     print ff
 
-if 1:
+if 0:
     x,y,z = sp.symbols('xyz')
     exprs = [x+y,x*x+y*y,x*x*x+y*y*y]
     xx = np.linspace(0,1,3)
@@ -89,7 +89,7 @@ if 0:
     print npx.shape
 
 if 1:
-    thetas = np.linspace(0,np.pi,26) 
+    thetas = np.linspace(0,np.pi,25) 
     phis = np.linspace(0,2*np.pi,25)
 
     val_func = lambda t,p: 1
@@ -97,20 +97,21 @@ if 1:
     
     print cs_vals.shape
 
-    file_pathname = os.path.abspath('')
+    file_pathname = r'C:\Documents and Settings\wflynn\My Documents\workspace\spinwaves_git\spinwaves\cross_section'#os.path.abspath('')
 
-#    x = np.load(os.path.join(file_pathname,'myfilex.txt.npy'))
-#    y = np.load(os.path.join(file_pathname,'myfiley.txt.npy'))
-#    z = np.load(os.path.join(file_pathname,'myfilez.txt.npy'))
-    x = np.load(os.path.join(file_pathname,'testx.txt.npy'))
-    y = np.load(os.path.join(file_pathname,'testy.txt.npy'))
-    z = np.load(os.path.join(file_pathname,'testz.txt.npy'))
+    x = np.load(os.path.join(file_pathname,'myfilex.txt.npy'))
+    y = np.load(os.path.join(file_pathname,'myfiley.txt.npy'))
+    z = np.load(os.path.join(file_pathname,'myfilez.txt.npy'))
+#    x = np.load(os.path.join(file_pathname,'testx.txt.npy'))
+#    y = np.load(os.path.join(file_pathname,'testy.txt.npy'))
+#    z = np.load(os.path.join(file_pathname,'testz.txt.npy'))
 
     print x.shape
     print y.shape
     print z.shape
+    print z
     
-    plt.contourf(x,y,z)
+    plt.contourf(x,y,z.T)
     plt.show()
 
 

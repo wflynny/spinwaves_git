@@ -399,7 +399,8 @@ def calculate_dispersion(atom_list,N_atoms_uc,N_atoms,Jij,showEigs=False):
         XdX,g=gen_XdX(atom_list,operator_table,operator_table_dagger,Hcomm,N_atoms_uc)
 #        print 'XdX',XdX
 #        print 'g',g
-        TwogH2=2*g*XdX
+        TwogH2=g*XdX
+#        TwogH2=2*g*XdX
 #        print 'TwogH2',TwogH2
         print 'trigifying'
         m,n=TwogH2.shape
