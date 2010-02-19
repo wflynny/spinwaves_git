@@ -394,7 +394,27 @@ class Worker(multiprocessing.Process):
             
             # process blocks here if outputQueue is full
             self.outputQueue.put(job)
-            
+
+def start_mapper():
+    ######## main program
+
+    Pyro.core.initServer()
+    ns=Pyro.naming.NameServerLocator().getNS()
+    daemon=Pyro.core.Daemon()
+    daemon.useNameServer(ns)
+
+    try:
+        ns.createGroup(":Mapper")
+    except NamingError:
+        pass
+    try:
+        ns.unregister(":Mapper.dispatcher")
+    except NamingError:
+        pass
+    uri=daemon.connect(Mapper(),":Mapper.dispatcher")
+    
+    daemon.requestLoop()
+
 def func(y,x,z,*args):
     print 'x',x
     print 'y',y
