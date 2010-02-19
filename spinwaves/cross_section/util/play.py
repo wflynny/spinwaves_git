@@ -111,7 +111,7 @@ if 1:
     print z.shape
     print z
     
-    plt.contourf(x,y,z.T)
+    plt.contourf(x,y,z)
     plt.show()
 
 
