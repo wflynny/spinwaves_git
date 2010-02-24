@@ -699,7 +699,7 @@ def eval_cross_section(N_atoms_uc, csection, kaprange, tau_list, eig_list, kapve
 
 #@profile
 def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, tau, eig_list, wt,
-                       temperature, ffval, eief = True, efixed = 14.7):
+                       temperature, ffval, eief = True, efixed = 14.7, eps = 0.01):
     """
     This method uses the core of eval_cross_section. It takes a single value for wt, tau. Instead of kx,ky,kz lists,
     it takes a single of the following: theta, phi and radius. With them, it calculates kx, ky, kz and kappa. 
@@ -714,6 +714,8 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     temperature             - temperature
     ffval                   - form factor term, taken from list of form factors calculated in generate_cross_section
     eief, efixed            - determines whether we want Ef/Ei. if true: ef/ei ef=ei-eigenval and ei=14.7 meV
+    eps                     - this value determines the size of the epsilon neighborhood around 0 with which is used
+                              to exclude values of omega which will return an infinite thermal averaged n_q value. 
     
     This method is faster than the eval_cross_section method. Use this one.
     
@@ -789,11 +791,14 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
         eigtemp = sp.abs(eigtemp.evalf(chop=True)) #works
         #eigtemp = chop(np.abs(eigtemp))
 
-        # the thermal average of n_q. THIS IS CURRENTLY ..BROKEN
-        if sp.abs(eigtemp) > 0.05:
-            nval = sp.Pow(sp.exp(sp.abs(eigtemp)/(BOLTZ_VALUE*temperature))-1,-1) #correct but bad results
+        # the thermal average of n_q.
+        # values of w_q that are close to zero are related to elastic scattering, which in previous steps
+        # of the cross-section calculation we have already excluded. This should take care of futher excluding
+        # values of w_q that are near zero. 
+        if sp.abs(eigtemp) > eps:
+            nval = sp.Pow(sp.exp(sp.abs(eigtemp)/(BOLTZ_VALUE*temperature))-1,-1)
         else:
-            nval = sp.S(0) #good results with this
+            nval = sp.S(0)
 
         # subs in the value for nq
         for i in range(N_atoms_uc):
@@ -841,6 +846,7 @@ def single_cross_section_calc(theta, phi, rad, N_atoms_uc, atom_list, csection, 
     
     # Multiply by form factor
     csdata = (0.5*G_VALUE*ffval)**2*csdata
+#    csdata = (0.5*G_VALUE)**2*csdata
     
     #print kx,'\t\t',ky,'\t\t',kz,'\t\t',csdata
     return csdata#*np.sin(theta)*rad**2
@@ -933,7 +939,7 @@ def plot_cross_section(xi, wtlist, csdata, myFlag = True):
 #        locator.set_bounds(zmin, zmax)
         locator.set_bounds(zmin, 20)
         levs = locator()
-        levs[0]=0.3
+        levs[0]=0.5
         plt.contourf(xi,yi,zi, levs)
         
         l_f = ticker.LogFormatter(10, labelOnlyBase=False)
@@ -961,7 +967,7 @@ def save_cs_files(xarr,yarr,zarr,others):
     
     print "Files Saved"
     
-def run_cross_section(interactionfile, spinfile, direction=[1,0,0], hkl_interval=[1e-3,2*np.pi,50], omega_interval=[0,5,50]):
+def run_cross_section(interactionfile, spinfile, tau_list, direction=[1,0,0], hkl_interval=[1e-3,2*np.pi,50], omega_interval=[0,5,50]):
     """
     We use this method to generate the expression for the cross-section given just the interaction and spins file.
     *** Use this first to calculate cross-section before using any other methods as they all need the csection expression
@@ -1007,9 +1013,7 @@ def run_cross_section(interactionfile, spinfile, direction=[1,0,0], hkl_interval
     vect2 = np.array([[0,0,1]])
     lattice = Lattice(aa, bb, cc, alpha, beta, gamma, Orientation(vect1, vect2))
     
-    tau_list = []
-    for i in range(1):
-        tau_list.append(np.array([0,0,0], 'Float64'))
+    tau_list = tau_list
 
     if direction != None and hkl_interval != None:
         if direction[0]:
@@ -1185,9 +1189,11 @@ if __name__=='__main__':
     interfile = os.path.join(file_pathname,r'montecarlo.txt')
     spinfile = os.path.join(file_pathname,r'spins.txt')
 
+    tau_list = [np.array([0,0,0])]
+
     atom_list, jnums, jmats,N_atoms_uc=readFiles(interfile,spinfile)
     
-    N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wt_list,fflist = run_cross_section(interfile,spinfile)
+    N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wt_list,fflist = run_cross_section(interfile,spinfile,tau_list)
 #    left_conn, right_conn = Pipe()
 #    p = Process(target = create_latex, args = (right_conn, csection, "Cross-Section"))
 #    p.start()
@@ -1196,12 +1202,11 @@ if __name__=='__main__':
 #    p.join()
 #    p.terminate()
 
-    h_list = np.linspace(0.001,2*np.pi-0.5,50)
-    k_list = np.zeros(h_list.shape)
-    l_list = np.zeros(h_list.shape)
-    w_list = np.linspace(0,5,40)
+    h_list = kapvect[:,0]
+    k_list = kapvect[:,1]
+    l_list = kapvect[:,2]
+    w_list = wt_list
     temperature = 0.0001
-    points = []
 
     # FASTER/MORE-ACCURATE METHOD TO GENERATE CROSS SECTION
     if 1:
