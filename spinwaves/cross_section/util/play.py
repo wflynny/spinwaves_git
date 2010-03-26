@@ -24,6 +24,63 @@ import spinwaves.spinwavecalc.readfiles as rf
 from timeit import default_timer as time
 from spinwaves.cross_section.csection_calc import plot_cross_section
 
+if 1:
+    h = np.linspace(1,20,20)
+    k = np.linspace(1,20,20)
+    l = np.linspace(1,20,20)
+    S = sp.Symbol('S')
+    kx = sp.Symbol('kx')
+    ky = sp.Symbol('ky')
+    kz = sp.Symbol('kz')
+    hsave = np.array([[1.9999993389278*S - 1.99999966945827*S*sp.cos(kx) - 4.69089402684015e-6*S*sp.sin(kx),-1.5273185983403e-7*S*sp.cos(kx) + 2.8703938375953e-7*sp.I*S*sp.cos(kx)],
+                      [1.5273185983403e-7*S*sp.cos(kx) + 2.8703938375953e-7*sp.I*S*sp.cos(kx), -1.9999993389278*S + 1.99999966945827*S*sp.cos(kx) - 4.69089402684015e-6*S*sp.sin(kx)]])
+    
+    def calc_eigs(mat,h,k,l):
+        #get rid of these
+        S_SYM = sp.Symbol('S')
+        KX_SYM = sp.Symbol('kx')
+        KY_SYM = sp.Symbol('ky')
+        KZ_SYM = sp.Symbol('kz')        
+
+        #lambdification
+        syms = (S_SYM,KX_SYM,KY_SYM,KZ_SYM)
+        matsym = mat.tolist()
+        func = sp.lambdify(syms,matsym,modules=["sympy"])
+
+        # reduce symbolic matrix to numerical matrix
+        matarr = []
+        eigarr = []
+        Slist = np.ones(h.shape)
+        for i in range(len(h)):
+            eigmat = np.array(func(Slist[i],h[i],k[i],l[i]))
+
+            for i in range(len(eigmat)): 
+                for j in range(len(eigmat)):
+                    print i,j
+                    eigmat[i,j] = eigmat[i,j].evalf()
+#                    eigmat[i,j] = sp.re(eigmat[i,j])#
+                    eigmat[i,j] = eigmat[i,j].subs(sp.I,0.+1.j)
+            print eigmat
+            eigs, = np.linalg.eig(eigmat)
+            eigarr.append(eigs)   
+        
+#        matnum = np.matrix(matarr)
+            
+    res = calc_eigs(hsave,h,k,l)
+    print res[0,0]
+    print res.shape
+    
+    
+                        
+
+if 1:
+    x = sp.Symbol('x')
+    e = sp.sin(x)
+    f = sp.sqrt(x)
+    res1 = sp.ccode(e)
+    res2 = sp.ccode(f)
+    print res1,res2
+
 if 0:
     ts = ['t%i'%i for i in range(5)]
     ps = ['p%i'%i for i in range(5)]
@@ -88,7 +145,7 @@ if 0:
     print npx
     print npx.shape
 
-if 1:
+if 0:
     thetas = np.linspace(0,np.pi,25) 
     phis = np.linspace(0,2*np.pi,25)
 
@@ -129,7 +186,7 @@ if 0:
     csoutput = np.array(arr)
     plot_cross_section(csoutput[0],csoutput[1],csoutput[2])
 
-if 0:
+if 1:
     Sval = 1.0
     xval = 1.0
     yval = 2.0
@@ -148,9 +205,11 @@ if 0:
     expr_np2 = sp.lambdify((kx,ky,kz), expr2, modules = "numpy")
 
     #res_np = expr_np(Svals[:,newaxis,newaxis,newaxis],xvals[newaxis,:,newaxis,newaxis],yvals[newaxis,newaxis,:,newaxis],zvals[newaxis,newaxis,newaxis,:])
-    res_np = expr_np(sp.Symbol('S'),xvals[:,nax,nax],yvals[nax,:,nax],zvals[nax,nax,:])
+    res_np = expr_np(sp.Symbol('S'),xvals[:,nax,nax],yvals[:,nax,nax],zvals[:,nax,nax])
     
     print res_np.shape
+    print res_np
+
     
     exprs = [expr,expr]
     res_sym = sp.lambdify((S,kx,ky,kz),exprs)
