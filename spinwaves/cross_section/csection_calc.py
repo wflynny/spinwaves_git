@@ -1045,73 +1045,40 @@ def lambdify_expr(expr,syms,vals=None):
         
         func = sp.lambdify(syms,func(*vals),modules="sympy")
     return func
-
-def calc_eigs_direct(Hsave,H,K,L):
-        kx=sympy.Symbol('kx',real=True)
-        ky=sympy.Symbol('ky',real=True)
-        kz=sympy.Symbol('kz',real=True)
-        k=[kx,ky,kz]
-        TwogH2=Hsave
-        S=sympy.Symbol('S',real=True)
-        D=sympy.Symbol('D',real=True)
-        #TwogH2=TwogH2.subs(J,-1.0)
-        TwogH2=TwogH2.subs(S,1.0)
-        #eigs=TwogH2.eigenvals()
-        #print 'subbed_eigs',eigs
-        #TwogH2=TwogH2.subs(D,1.0)
-        qrange=[]
-        wrange0=[]
-        wrange1=[]
-        wrange=[]
-        #wrangec=[]
-        for p in range(len(H)): 
-            TwogH3=TwogH2.subs(kx,H[p])
-            TwogH3=TwogH3.subs(ky,K[p])
-            TwogH3=TwogH3.subs(kz,L[p])
-            #currnum=q*direction['ky']
-            #print 'currnum y',currnum
-            #TwogH3=TwogH3.subs(ky,currnum)
-            #currnum=q*direction['kz']
-            #TwogH3=TwogH3.subs(kz,currnum)
-            #I=sympy.Symbol('I')
-            Ntwo=TwogH3#.subs(I,1.0j)
-            m,n=Ntwo.shape
-            #print Ntwo.applyfunc(sympy.Basic.evalf)
-            Nthree=N.empty([m,n],'Float64')
-            if 1:
-                for i in range(m):
-                    for j in range(n):
-                        #print i,j
-                        #print Ntwo[i,j]
-                        #print 'matching'
-                        #print 'kx',Ntwo[i,j].match(kx)
-                        #print 'ky',Ntwo[i,j].match(ky)
-                        #Ntwo[i,j]=sympy.re(Ntwo[i,j].evalf())
-                        #Ntwo[i,j]=Ntwo[i,j].evalf()
-                        #Nthree[i,j]=complex(Ntwo[i,j].expand(complex=True))#.subs(I,1.0j)
-                        Nthree[i,j]=Ntwo[i,j]
-                        if 1:
-                            if N.absolute(Nthree[i,j])<1e-5:
-                                Nthree[i,j]=0.0
-            #print 'Ntwo',Ntwo
-            #print 'Nthree',Nthree
-            if 1:
-                
-                l,v=scipy.linalg.eig(Nthree)
-                for cur_l in l:
-                    cur_l=cur_l.real
-#                print l[1]
-                wrange.append(l)
-        return N.array(wrange,'Float64')
-
-def calc_eigs(mat,h,k,l):
     
-    matarr = []
+def calc_eigs_numerically(mat,h,k,l,S=1):
+    """
+    Give it a matrix, and the (h,k,l) values to substitute into that matrix, each in a separate list.
+    S is automatically evaluated as one, but can be changed. h,k,l lists must be the same length.
+    """
+    #get rid of these
+    S_SYM = sp.Symbol('S')
+    KX_SYM = sp.Symbol('kx')
+    KY_SYM = sp.Symbol('ky')
+    KZ_SYM = sp.Symbol('kz')        
+
+    #lambdification functionality
+    syms = (S_SYM,KX_SYM,KY_SYM,KZ_SYM)
+    matsym = mat.tolist()
+    func = sp.lambdify(syms,matsym,modules=["sympy"])
+    
+    eigarr = []
+    Slist = S*np.ones(h.shape)
+    
+    # reduce symbolic matrix to numerical matrix and calculate the eigenvalues
     for i in range(len(h)):
-        pass
+        eigmat = np.array(func(Slist[i],h[i],k[i],l[i]))
         
-    
+        # Convert numpy array to sympy matrix and lambdify it to
+        # exchange sympy.I with numpy's 1j. Then convert it back to 
+        # a numpy array and append it to the list of eigs. 
+        eigmat = sp.Matrix(eigmat)
+        I2jfunc = sp.lambdify((sp.I),eigmat,modules="numpy")
+        eigmat = np.array(I2jfunc(1j))
 
+        eigs,vects = np.linalg.eig(eigmat)
+        eigarr.append(eigs)
+    return np.array(eigarr)
 
 def run_cross_section(interactionfile, spinfile, tau_list, temperature, 
                       direction=[1,0,0], hkl_interval=[1e-3,2*np.pi,1000], omega_interval=[0,5,1000]):

@@ -16,13 +16,15 @@ import numpy as np
 import sympy as sp
 from scipy.sparse import bsr_matrix
 from scipy.optimize import fmin_l_bfgs_b
+from timeit import time
 
 def gen_Jij(atom_list,jmats):
     """ Creates a scipy bsr sparse array of the Jij interaction matrices"""
     N_atoms = len(atom_list)
     jij_values = []
     jij_columns = []
-    jij_rowIndex = []   
+    jij_rowIndex = []
+    zeroval = np.zeros((3,3))
     
     # Counts total number of interactions: needed for row indexing
     num_inters = 0
@@ -35,23 +37,29 @@ def gen_Jij(atom_list,jmats):
 
         # Now we have a sorted list of (nbr,intr) tuples from lowest neighbor to highest neighbor
         # Scan through interactions
-        for j in range(len(nbrs_ints)):
-            nbr = nbrs_ints[j][0]
-            intr = nbrs_ints[j][1]
-
-            #Get an interaction matrix
-            curr_mat = jmats[intr].tolist()
-            curr_mat = np.array(curr_mat, dtype=np.float64)
-
-            # Values   = current matrix
-            # Columns  = the current neighbor
-            # RowIndex = total number of interactions 
-            jij_values.append(curr_mat)
-            jij_columns.append(nbr)
-            if j == 0:
-                jij_rowIndex.append(num_inters)
-            
-            # Increase number of total interactions
+        if len(nbrs_ints)>0:
+            for j in range(len(nbrs_ints)):
+                nbr = nbrs_ints[j][0]
+                intr = nbrs_ints[j][1]
+    
+                #Get an interaction matrix
+                curr_mat = jmats[intr].tolist()
+                curr_mat = np.array(curr_mat, dtype=np.float64)
+    
+                # Values   = current matrix
+                # Columns  = the current neighbor
+                # RowIndex = total number of interactions 
+                jij_values.append(curr_mat)
+                jij_columns.append(nbr)
+                if j == 0:
+                    jij_rowIndex.append(num_inters)
+                
+                # Increase number of total interactions
+                num_inters = num_inters + 1
+        else:
+            jij_values.append(zeroval)
+            jij_columns.append(0)
+            jij_rowIndex.append(num_inters)
             num_inters = num_inters + 1
     # Add dummy index to rowIndex
     jij_rowIndex.append(len(jij_values))
@@ -60,6 +68,13 @@ def gen_Jij(atom_list,jmats):
     jij_values = np.array(jij_values)
     jij_columns = np.array(jij_columns)
     jij_rowIndex = np.array(jij_rowIndex)
+    
+    print jij_values
+    print jij_values.shape[1:]
+    print N_atoms + 1
+    print len(jij_rowIndex)
+    print jij_columns
+    print jij_rowIndex
     
     # Create Sparse Array
     jij = bsr_matrix( (jij_values,jij_columns,jij_rowIndex), shape=(3*N_atoms,3*N_atoms) ).todense()
@@ -77,7 +92,7 @@ def gen_anisotropy(atom_list):
     anis_vect = np.array(anis_vect)
     return anis_vect
 
-def opt_aux(atom_list, jmats, spins, tol = 1.0e-25):
+def opt_aux(atom_list, jmats, spins, tol = 1.0e-10):
     """This function separates the functionality of the optimizer from the
     files.  This method assumes that jmats is in the correct order. 
     ie. jnums looks like [0,1,2,3...]"""
@@ -90,6 +105,8 @@ def opt_aux(atom_list, jmats, spins, tol = 1.0e-25):
     for atom in atom_list:
         spin_mags.append(atom.spinMag)
     spin_mags = np.array(spin_mags)
+    
+    print "got here!"
     
     # hamiltonian method
     def hamiltonian(p, Jij = None, spinMags = None, anis = None):
@@ -207,9 +224,13 @@ def opt_aux(atom_list, jmats, spins, tol = 1.0e-25):
         else:#phi
             limits.append((-pi,pi))
     
+    print "about to call function"
+    
+    st = time.time()
     # call minimizing function
     m = fmin_l_bfgs_b(hamiltonian, p0, fprime = deriv, args = (Jij, spin_mags, anis), pgtol=tol, bounds = limits)
-    
+    print time.time()-st, "seconds"
+    print "function done"
     # grab returned parameters
     # thetas are the first half of the list, phis are the second half
     pout=m[0]
@@ -219,15 +240,18 @@ def opt_aux(atom_list, jmats, spins, tol = 1.0e-25):
     sx=spin_mags*sin(theta)*cos(phi)
     sy=spin_mags*sin(theta)*sin(phi)
     sz=spin_mags*cos(theta)
+    
+    print "local optimization done"
 
     return np.array([sx,sy,sz]).T   
 
 
 if __name__ == '__main__':
     #print optimizeSpins('C:\\export.txt', 'C:\\spins.txt', 'C:\\spins2.txt')
-    #interfile = 'c:/test_montecarlo.txt'
-    #spinfile  = 'c:/test_Spins.txt'
-    interfile='c:/montecarlo_ferro.txt'
-    spinfile='c:/Spins_ferro.txt'
-    readfile=interfile
+    interfile = 'C:/Documents and Settings/wflynn/Desktop/yang_montecarlo.txt'
+    spinfile  = 'c:/Documents and Settings/wflynn/Desktop/spins.txt'
+    atoms, mats = readFile(interfile)
+    #interfile='c:/montecarlo_ferro.txt'
+    #spinfile='c:/Spins_ferro.txt'
+    #readfile=interfile
     tol = 1.0e-8

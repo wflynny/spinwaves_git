@@ -703,6 +703,43 @@ def Sapplycommutation(atom_list,Sfou,k):
     
     
     return Sfou
+
+
+def calc_eigs_numerically(mat,h,k,l,S=1):
+    """
+    Give it a matrix, and the (h,k,l) values to substitute into that matrix, each in a separate list.
+    S is automatically evaluated as one, but can be changed. h,k,l lists must be the same length.
+    """
+    #get rid of these
+    S_SYM = sp.Symbol('S')
+    KX_SYM = sp.Symbol('kx')
+    KY_SYM = sp.Symbol('ky')
+    KZ_SYM = sp.Symbol('kz')        
+
+    #lambdification functionality
+    syms = (S_SYM,KX_SYM,KY_SYM,KZ_SYM)
+    matsym = mat.tolist()
+    func = sp.lambdify(syms,matsym,modules=["sympy"])
+    
+    eigarr = []
+    Slist = S*np.ones(h.shape)
+    
+    # reduce symbolic matrix to numerical matrix and calculate the eigenvalues
+    for i in range(len(h)):
+        eigmat = np.array(func(Slist[i],h[i],k[i],l[i]))
+        
+        # Convert numpy array to sympy matrix and lambdify it to
+        # exchange sympy.I with numpy's 1j. Then convert it back to 
+        # a numpy array and append it to the list of eigs. 
+        eigmat = sp.Matrix(eigmat)
+        I2jfunc = sp.lambdify((sp.I),eigmat,modules="numpy")
+        eigmat = np.array(I2jfunc(1j))
+
+        eigs,vects = np.linalg.eig(eigmat)
+        eigarr.append(eigs)
+    return np.array(eigarr)
+
+
 def driver1(spinfile,interactionfile):
     """generates Hsave"""
     atom_list, jnums, jmats,N_atoms_uc=readfiles.readFiles(interactionfile,spinfile)
@@ -718,6 +755,10 @@ def driver1(spinfile,interactionfile):
     
     print 'driver1: complete'
     print Hsave
+    
+    Hamfile = open('Hsave.txt','w')
+    Hamfile.write(string_(Hsave))
+    Hamfile.close()
     
     return Hsave
 
@@ -764,7 +805,8 @@ def driver2(Hsave,direction, steps, kMin, kMax):
     qrange = []
     wrange = []
     for q in N.arange(kMin,kMax,(kMax- kMin)/steps):
-        wrange.append(calc_eigs(Hsave,q*direction['kx'], q*direction['ky'], q*direction['kz']))
+#        wrange.append(calc_eigs(Hsave,q*direction['kx'], q*direction['ky'], q*direction['kz']))
+        wrange.append(calc_eigs_numerically(Hsave,q*direction['kx'], q*direction['ky'], q*direction['kz']))
         qrange.append(q)
     
     wrange=N.real(wrange)
@@ -829,9 +871,13 @@ if __name__=='__main__':
         #spinfile=r'C:/Documents and Settings/wflynn/My Documents/workspace/spinwaves/spinwaves/spinwavecalc/tests/spins_sc.txt'
         #interactionfile=r'C:/Documents and Settings/wflynn/My Documents/workspace/spinwaves/spinwaves/spinwavecalc/tests/montecarlo_sc.txt'
         
-        #NEED TO CHANGE THESE! SPECIFIC TO BILL"S MACHINE
-        spinfile=r'C:/Users/Bill/Documents/Spins.txt.'#'C:/eig_test_Spins.txt'
-        interactionfile=r'C:/Users/Bill/Documents/montecarlo.txt'#'C:/eig_test_montecarlo.txt'
+        if 0:
+            #NEED TO CHANGE THESE! SPECIFIC TO BILL"S MACHINE
+            spinfile=r'C:/Users/Bill/Desktop/Spins.txt.'#'C:/eig_test_Spins.txt'
+            interactionfile=r'C:/Users/Bill/Documents/montecarlo.txt'#'C:/eig_test_montecarlo.txt'
+        if 1:
+            spinfile=r'C:/Documents and Settings/wflynn/Desktop/spins.txt'
+            interactionfile=r'C:/Documents and Settings/wflynn/Desktop/yang_montecarlo.txt'
         
         steps=100
         data={}

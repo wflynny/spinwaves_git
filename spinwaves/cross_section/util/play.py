@@ -25,9 +25,13 @@ from timeit import default_timer as time
 from spinwaves.cross_section.csection_calc import plot_cross_section
 
 if 1:
-    h = np.linspace(1,20,20)
-    k = np.linspace(1,20,20)
-    l = np.linspace(1,20,20)
+    e = 1 + sp.I
+    print e.subs(sp.I,np.complex(0,1))
+
+if 1:
+    h = np.linspace(1,20,600)
+    k = np.linspace(1,20,600)
+    l = np.linspace(1,20,600)
     S = sp.Symbol('S')
     kx = sp.Symbol('kx')
     ky = sp.Symbol('ky')
@@ -35,7 +39,11 @@ if 1:
     hsave = np.array([[1.9999993389278*S - 1.99999966945827*S*sp.cos(kx) - 4.69089402684015e-6*S*sp.sin(kx),-1.5273185983403e-7*S*sp.cos(kx) + 2.8703938375953e-7*sp.I*S*sp.cos(kx)],
                       [1.5273185983403e-7*S*sp.cos(kx) + 2.8703938375953e-7*sp.I*S*sp.cos(kx), -1.9999993389278*S + 1.99999966945827*S*sp.cos(kx) - 4.69089402684015e-6*S*sp.sin(kx)]])
     
-    def calc_eigs(mat,h,k,l):
+    def calc_eigs(mat,h,k,l,S=1):
+        """
+        Give it a matrix, and the (h,k,l) values to substitute into that matrix, each in a separate list.
+        S is automatically evaluated as one, but can be changed.
+        """
         #get rid of these
         S_SYM = sp.Symbol('S')
         KX_SYM = sp.Symbol('kx')
@@ -50,30 +58,33 @@ if 1:
         # reduce symbolic matrix to numerical matrix
         matarr = []
         eigarr = []
-        Slist = np.ones(h.shape)
+        Slist = S*np.ones(h.shape)
+        
         for i in range(len(h)):
             eigmat = np.array(func(Slist[i],h[i],k[i],l[i]))
-
-            for i in range(len(eigmat)): 
-                for j in range(len(eigmat)):
-                    print i,j
-                    eigmat[i,j] = eigmat[i,j].evalf()
-#                    eigmat[i,j] = sp.re(eigmat[i,j])#
-                    eigmat[i,j] = eigmat[i,j].subs(sp.I,0.+1.j)
-            print eigmat
-            eigs, = np.linalg.eig(eigmat)
-            eigarr.append(eigs)   
-        
-#        matnum = np.matrix(matarr)
             
+            # Convert numpy array to sympy matrix and lambdify it to
+            # exchange sympy.I with numpy's 1j. Then convert it back to 
+            # a numpy array and append it to the list of eigs. 
+            eigmat = sp.Matrix(eigmat)
+            I2jfunc = sp.lambdify((sp.I),eigmat,modules="numpy")
+            eigmat = np.array(I2jfunc(1j))
+
+            eigs,vects = np.linalg.eig(eigmat)
+            eigarr.append(eigs)
+            
+        return np.array(eigarr)
+    
+    start = time()
     res = calc_eigs(hsave,h,k,l)
-    print res[0,0]
+    print time()-start
+    print res
     print res.shape
     
     
                         
 
-if 1:
+if 0:
     x = sp.Symbol('x')
     e = sp.sin(x)
     f = sp.sqrt(x)
@@ -186,7 +197,7 @@ if 0:
     csoutput = np.array(arr)
     plot_cross_section(csoutput[0],csoutput[1],csoutput[2])
 
-if 1:
+if 0:
     Sval = 1.0
     xval = 1.0
     yval = 2.0

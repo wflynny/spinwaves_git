@@ -252,6 +252,7 @@ def get_ground_state(k, tMax, tMin, tFactor, atoms, jMatrices, tol = 1e-25):
     spins = Sim_Aux(k, tMax, tMin, tFactor, atoms, jMatrices)
     opt_spins = opt_aux(atoms, jMatrices, spins, tol)
     return opt_spins
+    return spins
 
   
 def passAtoms(atoms):
