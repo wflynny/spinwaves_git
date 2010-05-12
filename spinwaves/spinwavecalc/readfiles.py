@@ -75,6 +75,7 @@ def readFiles(interactionFileStr,spinFileStr, allAtoms=False):
             Na = int(tokenized[0])
             Nb = int(tokenized[1])
             Nc = int(tokenized[2])
+            print "Na",Na,"Nb",Nb,"Nc",Nc
             
         if tokenized[0]=='#number':
             while 1:

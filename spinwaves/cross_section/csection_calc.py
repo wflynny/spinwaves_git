@@ -280,8 +280,8 @@ def holstein(atom_list, arg):
                 if not piece.has(T_SYM):
                     arg[k][i] = arg[k][i] - piece
 
-            S2coeff = coeff(arg[k][i], S_SYM**2)
-            Scoeff = coeff(arg[k][i], S_SYM)
+            S2coeff = arg[k][i].coeff(S_SYM**2)
+            Scoeff = arg[k][i].coeff(S_SYM)
             if S2coeff != None and Scoeff != None:
                 temp.append((S2coeff*S_SYM**2 + Scoeff*S_SYM).subs(S_SYM,Snew))
             elif S2coeff != None and Scoeff == None:

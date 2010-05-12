@@ -1,0 +1,75 @@
+\documentclass{article}[11pt]
+
+
+\author{Bill Flynn}
+\title{Spinwave Calc File}
+
+
+\begin{document}
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{}
+
+First we generate the spin of each atom in the local coordinate system (using the z-axis as the quantization axis). This yields a list of $\mbox{length}\;=\;\mbox{number of atoms}$ with elements of the form:
+
+\begin{equation}
+	s_{i}=\left(\begin{array}{ccc}
+		\sqrt{\frac{S}{2}}\left(c_i + c_i^\dagger\right) \\
+		\sqrt{\frac{S}{2}}\left(c_i - c_i^\dagger\right)/i \\
+		\textbf{S}-c_i c_i^\dagger 
+	\end{array}\right) 
+\end{equation}
+
+where $\textbf{S}$ is a constant (bolded for emphasis -- do not confuse with matrix/vector/etc.). We then transform the local spins into the global coordinate system using a specific rotation matrix determined during the simulated annealing process.
+
+\begin{equation}
+	S_{i} = Rot_{i} s_{i}
+\end{equation}
+
+Each of the N atoms in the atom array has a vector which describes its anisotropy, or preference to point in a particular direction, and a matrix which describes how that atom interacts with other atoms. We use these to create the hamiltonian:
+\begin{equation}
+	H = -\displaystyle \sum_{i,j=0}^{N} S_{i} J_{ij} S_{j} - \displaystyle \sum_{\alpha}D_{\alpha}S_{i_{\alpha}}^{2}
+\end{equation}
+\noindent where $J_{ij}$ is the interaction matrix between two interacting atoms and $D_{\alpha}$ corresponds to preference along the $\left\{x,y,z\right\}$ directions. This process yeilds an expression which we then simplify by removing all terms that do not depend on spin, $\textbf{S}$. For example, the expression
+\begin{equation}
+	A\textbf{S}^{2} + B \textbf{S} + C + D \textbf{S}^{2} + E + F \textbf{S} + \ldots
+\end{equation}
+is reduced to 
+\begin{equation}
+	A\textbf{S}^{2} + B \textbf{S} + D \textbf{S}^{2} + F \textbf{S} + \ldots.
+\end{equation}
+
+For the Fourier transform, we make the following substitutions in the Hamiltonian, $H$:
+\begin{eqnarray}
+	c_{i}^{\dagger}c_{j}^{\dagger} & \rightarrow & \frac{1}{2}\left(c_{k,i}^{\dagger}c_{-k,j}^{\dagger}e^{-i \vec{k} \cdot \vec{r}} + c_{-k,i}^{\dagger}c_{k,j}^{\dagger}e^{i \vec{k} \cdot \vec{r}}\right) \\
+	c_{i}c_{j} & \rightarrow & \frac{1}{2}\left(c_{k,i}c_{-k,j}e^{i \vec{k} \cdot \vec{r}} + c_{-k,i}c_{k,j}e^{-i \vec{k} \cdot \vec{r}}\right) \\
+	c_{i}^{\dagger}c_{j} & \rightarrow & \frac{1}{2}\left(c_{k,i}^{\dagger}c_{k,j}e^{-i \vec{k} \cdot \vec{r}} + c_{-k,i}^{\dagger}c_{-kj}e^{i \vec{k} \cdot \vec{r}}\right) \\
+	c_{i}c_{j}^{\dagger} & \rightarrow & \frac{1}{2}\left(c_{k,i}c_{k,j}^{\dagger}e^{i \vec{k} \cdot \vec{r}} + c_{-k,i}c_{-k,j}^{\dagger}e^{-i \vec{k} \cdot \vec{r}}\right) \\	
+	c_{j}^{\dagger}c_{j} & \rightarrow & \frac{1}{2}\left(c_{k,j}^{\dagger}c_{k,j}+c_{-k,j}^{\dagger}c_{-k,j}\right)
+\end{eqnarray}
+\noindent Additionally, we substitute in the following commutation relations:
+\begin{eqnarray}
+	c_{k,i}c_{k,j}^{\dagger} & \rightarrow & c_{k,j}^{\dagger}c_{k,i} + \delta_{ij} \\
+	c_{-k,i}^{\dagger}c_{-k,j} & \rightarrow & c_{-k,j}^{\dagger}c_{-k,i} + \delta_{ij} \\	
+	c_{k,i}c_{-k,j} & \rightarrow & c_{-k,j}c_{k,i} \\
+	c_{-k,j}^{\dagger}c_{k,i}^{\dagger} & \rightarrow & c_{k,i}^{\dagger}c_{-k,j}^{\dagger}
+\end{eqnarray}
+
+We then create the two arrays
+\begin{equation}
+	O = \left[ c_{k,1}, c_{k,2}, \ldots , c_{k,N}, c_{-k,1}^{\dagger}, c_{-k,2}^{\dagger}, \ldots, c_{-k,N}^{\dagger} \right]
+\end{equation}
+and 
+\begin{equation}
+	O^{\dagger} = \left[ c_{k,1}^{\dagger}, c_{k,2}^{\dagger}, \ldots , c_{k,N}^{\dagger}, c_{-k,1}, c_{-k,2}, \ldots, c_{-k,N} \right]
+\end{equation}
+which we use to rewrite the Hamiltonian: 
+\begin{equation}
+	H = X_{ij} O_{i} O_{j}^{\dagger}
+\end{equation}
+We take these coefficients, the $X_{ij}$, and construct the matrix $X$ from them. We also construct a matrix $G$ that is the same size as $X$ which has a diagonal that looks like $\left\{1,1,\ldots,1,-1,-1,\ldots,-1\right\}$. The product $G X$ is our diagonalized Hamiltonian.  
+
+\end{document}

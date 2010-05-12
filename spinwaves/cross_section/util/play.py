@@ -25,10 +25,25 @@ from timeit import default_timer as time
 from spinwaves.cross_section.csection_calc import plot_cross_section
 
 if 1:
+    file_pathname = r'C:\Documents and Settings\wflynn\My Documents\workspace\spinwaves_git\spinwaves\spinwavecalc'#os.path.abspath('')
+
+    x = np.load(os.path.join(file_pathname,'oldHlin.txt.npy'))
+    y = np.load(os.path.join(file_pathname,'newHlin.txt.npy'))
+    
+    x=x[0].expand()
+    y=y[0].expand()
+
+    print x
+    print y    
+    
+    z = x - y
+    print sp.simplify(z)
+
+if 0:
     e = 1 + sp.I
     print e.subs(sp.I,np.complex(0,1))
 
-if 1:
+if 0:
     h = np.linspace(1,20,600)
     k = np.linspace(1,20,600)
     l = np.linspace(1,20,600)

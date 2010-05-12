@@ -17,6 +17,7 @@ import sys
 import matplotlib.pyplot as plt
 import spinwaves.cross_section.util.printing as printing
 from sympy.core.cache import clear_cache
+from copy import copy
 import os
 
 #translations=[[0,0,0],
@@ -34,7 +35,7 @@ def print_matplotlib(s):
     ##pylab.show()
     return 
 
-#NOT NEEDED ANYMORE
+
 def coeff(expr, term):
     if isinstance(expr, int):
         return 0
@@ -57,7 +58,6 @@ def coeff(expr, term):
     #added the next two lines
     elif m2:
         return m2[w]
-
 
 
 
@@ -112,85 +112,80 @@ def generate_sabnt(N_atoms,t=''):
 
 
 
-@profile
+
 def generate_hdef(atom_list,Jij,Sxyz,N_atoms_uc,N_atoms):
     "generate the hamiltonian for a set of interacting spins defined by Sxyz"
     N_atoms=len(atom_list)
-    Hdef=0
+#    Hdef=[]
 #    print 'Jij',Jij,len(Jij)
 
+    N_int = max([max(atom_list[i].neighbors) for i in range(N_atoms_uc)])+1
+    Hdef = sympy.matrices.Matrix(N_int,N_int,lambda i,j:0)
     print 'N_atoms_uc', N_atoms_uc
+    for i in range(len(atom_list)):
+        print 'neightbors', atom_list[i].neighbors
+        print 'interactions', atom_list[i].interactions
+    print 'N_int', N_int
+        
     #for i in range(N_atoms):
     for i in range(N_atoms_uc): #correct
-        N_int=len(atom_list[i].interactions)
-        for j in range(N_int):            
-            #print 'i',i,'j',j
-            if 0:
-                Hij=N.matrix(Sxyz[i])*atom_list[i].spin.T
-                print 'making Ham'
-                print 'spin i', atom_list[i].spin.T
-                print 'Sxyz i', N.matrix(Sxyz[i]),N.matrix(Sxyz[i]).shape
-                print 'Hijtemp',Hij
-                Hij=Hij*Jij[atom_list[i].interactions[j]]
-                print 'Jij', Jij[atom_list[i].interactions[j]]
-                print 'Hij*Jij', Hij
-                Hij=Hij*atom_list[atom_list[i].neighbors[j]].spin#
-                print 'Hijtemp3', Hij.shape
-            if 1:
-#                print 'Sxyz i', N.matrix(Sxyz[i]),N.matrix(Sxyz[i]).shape
+#        N_int=len(atom_list[i].interactions)
+        for j in range(N_int):  
+#        for j in range(N_int):            
+            if j in atom_list[i].neighbors:
+                ind = atom_list[i].neighbors.index(j)
+                print i,'i',j,'j'
+                Hij=Sxyz[i]*Jij[atom_list[i].interactions[ind]]
+                print '1', Hij
+                Sxyz_transpose=Sxyz[atom_list[i].neighbors[ind]].reshape(3,1)
+                print '2', Sxyz_transpose
+                Hij=Hij*Sxyz_transpose
+                print '3', Hij
+                Hij=Hij[0]
+                print 'Hij',Hij.expand()
+                #Hij=-Hij-atom_list[i].Dx*Sxyz[i][0]**2-atom_list[i].Dy*Sxyz[i][1]**2-atom_list[i].Dz*Sxyz[i][2]**2
+                Dij=-atom_list[i].Dx*Sxyz[i][0]**2-atom_list[i].Dy*Sxyz[i][1]**2-atom_list[i].Dz*Sxyz[i][2]**2
+#                    print 'Dij',Dij.expand()
+#                    print 'D+H',(Dij-Hij).expand()
+            else:
+                Hij = sympy.S(0)
+                Dij = sympy.S(0)
 
-                Hij=Sxyz[i]*Jij[atom_list[i].interactions[j]]
-#                print 'S*Jij', Hij,Hij.shape
-            #print "test ", atom_list[i]
-            #print "index: ", atom_list[i].neighbors[j], "  length = ", len(Sxyz)
-            Sxyz_transpose=Sxyz[atom_list[i].neighbors[j]].reshape(3,1)
-            #Sxyz_transpose=Sxyz_transpose.(3,1))
-#            print 'Sxyz.T',Sxyz_transpose.shape
-#            print 'Hij before multiply', Hij, Hij.shape
-            Hij=Hij*Sxyz_transpose
-#            print 'Hij*Sxyz.T',Hij,Hij.shape
-            Hij=Hij[0]
-            #Hij=Hij+myterm
-            Hij=-Hij-atom_list[i].Dx*Sxyz[i][0]**2-atom_list[i].Dy*Sxyz[i][1]**2-atom_list[i].Dz*Sxyz[i][2]**2
-            print Hij.expand()
-            Hdef=Hdef+Hij
+            Hdef[i,j]=(-Hij).expand()
+            Hdef[i,i]=(Hdef[i,i]+Dij).expand()
 #    print 'generated hdef'
 #    print 'Hdef:', Hdef
 #    print '\nHdef.atoms: ', Hdef.atoms(sympy.Symbol)
+    Hdef = N.array(Hdef)   
+    print Hdef
     return Hdef
 
-@profile
+
 def holstein(Hdef):
         S = sympy.Symbol('S',real=True)
         print 'holstein'
-        #print Hdef.atoms(sympy.Symbol)
-        Hdef=Hdef.expand()
-        #Hdef=Hdef.as_poly(S)
+
         p = sympy.Wild('p',exclude='S')
         q = sympy.Wild('q',exclude='S')
         r = sympy.Wild('r',exclude='S')
         l = sympy.Wild('l',exclude='S')
-        #Hlin=Hdef.coeffs[0]*S**2+Hdef.coeffs[1]*S
-        #OLD WAY
-#        S2coeff=coeff(Hdef,S**2)
-#        Scoeff=coeff(Hdef,S)
-        #NEW WAY
-        S2coeff=Hdef.coeff(S**2)
-        Scoeff=Hdef.coeff(S)
-        Hlin=None
-        #Hlin=coeff(Hdef,S**2)*S**2+coeff(Hdef,S)*S
-        #print 'S2Coeff', S2coeff
-        #print 'Scoeff',Scoeff
-        if Scoeff!=None and S2coeff!=None:
-            Hlin=Hdef.coeff(S**2)*S**2+Hdef.coeff(S)*S
-        elif Scoeff==None and S2coeff!=None:
-            Hlin=Hdef.coeff(S**2)*S**2
-        elif Scoeff!=None and S2coeff==None:
-            #print 'S'
-            Hlin=Hdef.coeff(S)*S
+
+        Hlin=copy(Hdef)
+        for i in range(len(Hdef)):
+            for j in range(len(Hdef[0])):
+                Hdef[i][j]=Hdef[i][j].expand()
+                S2coeff=coeff(Hdef[i][j],S**2)
+                Scoeff=coeff(Hdef[i][j],S)
+                
+                if Scoeff!=None and S2coeff!=None:
+                    Hlin[i][j]=S2coeff*S**2+Scoeff*S
+                elif Scoeff==None and S2coeff!=None:
+                    Hlin[i][j]+=S2coeff*S**2
+                elif Scoeff!=None and S2coeff==None:
+                    Hlin[i][j]+=Scoeff*S
         return Hlin
 
-@profile
+
 def fouriertransform(atom_list,Jij,Hlin,k,N_atoms_uc,N_atoms):
     #N_atoms=len(atom_list)
     #N_atoms_uc=1
@@ -207,8 +202,10 @@ def fouriertransform(atom_list,Jij,Hlin,k,N_atoms_uc,N_atoms):
 #    print Hlin.atoms(sympy.Symbol)
     #print Hlin
     #for i in range(N_atoms):
+    Hlin = sympy.Matrix(Hlin)
+    N_int = max([max(atom_list[i].neighbors) for i in range(N_atoms_uc)])+1
     for i in range(N_atoms_uc): #correct
-        N_int=len(atom_list[i].interactions)
+#        N_int=len(atom_list[i].interactions)
         ci=sympy.Symbol('c%d'%(i,),commutative=False,real=True)
         cdi=sympy.Symbol('cd%d'%(i,),commutative=False,real=True)
         cki=sympy.Symbol('ck%d'%(i,),commutative=False,real=True)
@@ -216,16 +213,19 @@ def fouriertransform(atom_list,Jij,Hlin,k,N_atoms_uc,N_atoms):
         cmki=sympy.Symbol('cmk%d'%(i,),commutative=False,real=True)
         cmkdi=sympy.Symbol('cmkd%d'%(i,),commutative=False,real=True)
         ri=atom_list[i].pos
-        N_int=len(atom_list[i].interactions)
-        for j in range(N_atoms): #range(N_int)
+#        N_int=len(atom_list[i].interactions)
+        for j in range(N_int): #range(N_int)
             rj=atom_list[j].pos # atom_list[
             j2=i#atom_list[i].neighbors[j]
+            print 'i, j', i, j
+
             cj=sympy.Symbol('c%d'%(j,),commutative=False,real=True)
             cdj=sympy.Symbol('cd%d'%(j,),commutative=False,real=True)
             ckj=sympy.Symbol('ck%d'%(j2,),commutative=False,real=True)
             ckdj=sympy.Symbol('ckd%d'%(j2,),commutative=False,real=True)
             cmkj=sympy.Symbol('cmk%d'%(j2,),commutative=False,real=True)
             cmkdj=sympy.Symbol('cmkd%d'%(j2,),commutative=False,real=True)
+
             diffr=ri-rj
             kmult=N.dot(k,diffr)
             t1=1.0/2*(ckdi*cmkdj*exp(-I*kmult)+cmkdi*ckdj*exp(I*kmult))
@@ -233,46 +233,39 @@ def fouriertransform(atom_list,Jij,Hlin,k,N_atoms_uc,N_atoms):
             t3=1.0/2*(ckdi*ckj*exp(-I*kmult)+cmkdi*cmkj*exp(I*kmult))
             t4=1.0/2*(cki*ckdj*exp(I*kmult)+cmki*cmkdj*exp(-I*kmult))
             t5=1.0/2*(ckdj*ckj+cmkdj*cmkj)
-#            print 'i',i,'j',j
-            #print 'ci',ci,'cj',cj,'cdi',cdi,'cdj',cdj
-            #print 't1',t1
-            #print 't2',t2
-            #print 't3',t3
-            #print 't4',t4
-            #print 't5',t5
-            #a1=sympy.Symbol('a1')
-            #a2=sympy.Symbol('a2')
-            #a3=sympy.Symbol('a3')
-            #a4=sympy.Symbol('a4')
-            #a5=sympy.Symbol('a5')
-            f1=cdi*cdj
-#            print 'f1',f1,f1.atoms(sympy.Symbol)
-            Hlin=Hlin.subs(f1,t1)
-#            print 'H1',Hlin,Hlin.atoms(sympy.Symbol)
-            f2=ci*cj
-#            print 'f2',f2,f2.atoms(sympy.Symbol)
-            Hlin=Hlin.subs(f2,t2)
-#            print 'H2',Hlin,Hlin.atoms(sympy.Symbol)
-            f3=cdi*cj
-#            print 'f3',f3,f3.atoms(sympy.Symbol)
-            Hlin=Hlin.subs(f3,t3)
-#            print 'H3',Hlin,Hlin.atoms(sympy.Symbol)
-            f4=ci*cdj
-#            print 'f4',f4,f4.atoms(sympy.Symbol)
-            Hlin=Hlin.subs(f4,t4)
-#            print 'H4',Hlin,Hlin.atoms(sympy.Symbol)
-            f5=cdj*cj
-#            print 'f5',f5,f5.atoms(sympy.Symbol)
-            Hlin=Hlin.subs(f5,t5)
-#            print 'H5',Hlin,Hlin.atoms(sympy.Symbol)
-    #print t1
-    return Hlin#.expand()
 
-@profile
+            f1=cdi*cdj
+            f2=ci*cj
+            f3=cdi*cj
+            f4=ci*cdj
+            f5=cdj*cj
+
+            Hlin=Hlin.subs(f1,t1)
+            Hlin=Hlin.subs(f2,t2)
+            Hlin=Hlin.subs(f3,t3)
+            Hlin=Hlin.subs(f4,t4)
+            Hlin=Hlin.subs(f5,t5)
+
+
+#            Hlin[i][j]=Hlin[i][j].subs(f1,t1)
+#            Hlin[i][j]=Hlin[i][j].subs(f2,t2)
+#            Hlin[i][j]=Hlin[i][j].subs(f3,t3)
+#            Hlin[i][j]=Hlin[i][j].subs(f4,t4)
+#            Hlin[i][j]=Hlin[i][j].subs(f5,t5)
+#
+#            Hlin[j][i]=Hlin[j][i].subs(f1,t1)
+#            Hlin[j][i]=Hlin[j][i].subs(f2,t2)
+#            Hlin[j][i]=Hlin[j][i].subs(f3,t3)
+#            Hlin[j][i]=Hlin[j][i].subs(f4,t4)
+#            Hlin[j][i]=Hlin[j][i].subs(f5,t5)
+
+    return Hlin
+
 def applycommutation(atom_list,Jij,Hfou,k,N_atoms_uc,N_atoms):
     """Operate commutation relations to put all the 2nd order term as ckd**ck, cmk**cmkd, cmk**ck and ckd**cmkd form"""
     print "commutation application"
-    for i in range(N_atoms_uc):
+    N_int = max([max(atom_list[i].neighbors) for i in range(N_atoms_uc)])+1
+    for i in range(N_int):
         N_int=len(atom_list[i].interactions)
         ci=sympy.Symbol("c%d"%(i,),commutative=False,real=True)
         cdi=sympy.Symbol("cd%d"%(i,),commutative=False,real=True)
@@ -280,7 +273,7 @@ def applycommutation(atom_list,Jij,Hfou,k,N_atoms_uc,N_atoms):
         ckdi=sympy.Symbol("ckd%d"%(i,),commutative=False,real=True)
         cmki=sympy.Symbol("cmk%d"%(i,),commutative=False,real=True)
         cmkdi=sympy.Symbol("cmkd%d"%(i,),commutative=False,real=True)
-        for j in range(N_atoms_uc):
+        for j in range(N_int):
             cj=sympy.Symbol("c%d"%(j,),commutative=False,real=True)
             cdj=sympy.Symbol("cd%d"%(j,),commutative=False,real=True)
             ckj=sympy.Symbol("ck%d"%(j,),commutative=False,real=True)
@@ -289,20 +282,28 @@ def applycommutation(atom_list,Jij,Hfou,k,N_atoms_uc,N_atoms):
             cmkdj=sympy.Symbol("cmkd%d"%(j,),commutative=False,real=True)
             if i==j:
                 Hfou=Hfou.subs(cki*ckdj,ckdj*cki+1)
-                
                 Hfou=Hfou.subs(cmkdi*cmkj,cmkj*cmkdi+1)
                 
+#                Hfou[j][i]=Hfou[j][i].subs(cki*ckdj,ckdj*cki+1)
+#                Hfou[j][i]=Hfou[j][i].subs(cmkdi*cmkj,cmkj*cmkdi+1)
             else:
                 Hfou=Hfou.subs(cki*ckdj,ckdj*cki)
                 Hfou=Hfou.subs(cmkdi*cmkj,cmkj*cmkdi)
+                
+#                Hfou[j][i]=Hfou[j][i].subs(cki*ckdj,ckdj*cki)
+#                Hfou[j][i]=Hfou[j][i].subs(cmkdi*cmkj,cmkj*cmkdi)
+
             Hfou=Hfou.subs(cki*cmkj,cmkj*cki)
+#            Hfou[j][i]=Hfou[j][i].subs(cki*cmkj,cmkj*cki)
                 
             Hfou=Hfou.subs(cmkdi*ckdj,ckdj*cmkdi)
+#            Hfou[j][i]=Hfou[j][i].subs(cmkdi*ckdj,ckdj*cmkdi)
+            
+            Hfou.expand()
+#            Hfou[j][i].expand()
     
-    
-    return Hfou.expand()
+    return Hfou
 
-@profile
 def gen_operator_table(atom_list,N_atoms_uc):
     """Operate commutation relations to put all the 2nd order term as ckd**ck, cmk**cmkd, cmk**ck and ckd**cmkd form"""
 
@@ -319,11 +320,12 @@ def gen_operator_table(atom_list,N_atoms_uc):
         cmkdi=sympy.Symbol("cmkd%d"%(i,),commutative=False,real=True)
         operator_table.append(cki)
         operator_table_minus.append(cmkdi)
+
     operator_table=[operator_table,operator_table_minus]
     operator_table=N.ravel(operator_table)
     return operator_table
 
-@profile
+
 def gen_operator_table_dagger(atom_list,N_atoms_uc):
     """Operate commutation relations to put all the 2nd order term as ckd**ck, cmk**cmkd, cmk**ck and ckd**cmkd form"""
 
@@ -340,29 +342,35 @@ def gen_operator_table_dagger(atom_list,N_atoms_uc):
         cmkdi=sympy.Symbol("cmkd%d"%(i,),commutative=False,real=True)
         operator_table.append(ckdi)
         operator_table_minus.append(cmki)
+
     operator_table=[operator_table,operator_table_minus]
     operator_table=N.ravel(operator_table)
     return operator_table
 
-@profile
 def gen_XdX(atom_list,operator_table,operator_table_dagger,Hcomm,N_atoms_uc):
     """Operate commutation relations to put all the 2nd order term as ckd**ck, cmk**cmkd, cmk**ck and ckd**cmkd form"""
     print "gen_XdX"
     exclude_list=[]
     coeff_list=[]
-    #Hcomm=Hcomm.expand(deep = False)
+
+    print N_atoms_uc
+    N_int = max([max(atom_list[i].neighbors) for i in range(N_atoms_uc)])+1
+
     XdX=sympy.zeros(2*N_atoms_uc)
     g=sympy.zeros(2*N_atoms_uc)
     for i in range(2*N_atoms_uc):
         curr_row=[]
         for j in range(2*N_atoms_uc):
             mycoeff=operator_table_dagger[i]*operator_table[j]
-            print mycoeff
             exclude_list.append(mycoeff)
-            currcoeff=Hcomm.coeff(mycoeff)
-            if currcoeff!=None:
-                XdX[i,j]=currcoeff
-                curr_row.append(currcoeff)
+            currcoeff1=coeff(Hcomm[i,j].expand(),mycoeff)
+            currcoeff2=coeff(Hcomm[j,i].expand(),mycoeff)
+            print Hcomm[i,j]
+            print mycoeff
+            print currcoeff1,currcoeff2
+            if currcoeff1!=None and currcoeff2!=None:
+                XdX[i,j]=currcoeff1+currcoeff2
+                curr_row.append(currcoeff1+currcoeff2)
             if i!=j:
                 g[i,j]=0
             else:
@@ -374,12 +382,12 @@ def gen_XdX(atom_list,operator_table,operator_table_dagger,Hcomm,N_atoms_uc):
     return XdX,g
 
 
-@profile
+
 def calculate_dispersion(atom_list,N_atoms_uc,N_atoms,Jij,showEigs=False):
     Sabn=generate_sabn(N_atoms)       
 #    print 'Sabn',Sabn 
     Sxyz=generate_sxyz(Sabn,atom_list)
-#    print 'Sxyz', Sxyz
+    print 'Sxyz', Sxyz
         
     if 1:
         #print len(translations)   
@@ -387,16 +395,19 @@ def calculate_dispersion(atom_list,N_atoms_uc,N_atoms,Jij,showEigs=False):
         #Jij=[N.matrix([[J,0,0],[0,J,0],[0,0,J]])]
         #Hdef=generate_hdef(atom_list,Jij,Sabn,N_atoms_uc,N_atoms)
         Hdef=generate_hdef(atom_list,Jij,Sxyz,N_atoms_uc,N_atoms)
-        print 'Hdef',Hdef
+        print 'Hdef',Hdef.sum()
 #        file_pathname = os.path.abspath('')
-#        N.save(os.path.join(file_pathname,r'oldHlin.txt'),[Hdef])
+#        N.save(os.path.join(file_pathname,r'newHlin.txt'),[Hdef.sum()])
 #        sys.exit()
         
         #pngview(Hdef)
         #print_matplotlib(latex(Hdef)) 
     #if 0:
         Hlin=holstein(Hdef)
-
+#        print Hlin.sum()
+#        file_pathname = os.path.abspath('')
+#        N.save(os.path.join(file_pathname,r'newHlin.txt'),[Hlin.sum()])
+#        sys.exit()
         print 'Hlin',Hlin
         kx=sympy.Symbol('kx',real=True)
         ky=sympy.Symbol('ky',real=True)
@@ -406,12 +417,14 @@ def calculate_dispersion(atom_list,N_atoms_uc,N_atoms,Jij,showEigs=False):
         print 'Hfou',Hfou
     if 1:
         Hcomm=applycommutation(atom_list,Jij,Hfou,k,N_atoms_uc,N_atoms)
+#        Hcomm=Hcomm.sum()
 #        print 'Hcomm',Hcomm
         operator_table=gen_operator_table(atom_list,N_atoms_uc)
 #        print 'optable',operator_table
         operator_table_dagger=gen_operator_table_dagger(atom_list,N_atoms_uc)
 #        print 'optable_dagger',operator_table_dagger
         XdX,g=gen_XdX(atom_list,operator_table,operator_table_dagger,Hcomm,N_atoms_uc)
+        print XdX
 #        print 'XdX',XdX
 #        print 'g',g
         TwogH2=g*XdX
@@ -746,15 +759,15 @@ def calc_eigs_numerically(mat,h,k,l,S=1):
         # Convert numpy array to sympy matrix and lambdify it to
         # exchange sympy.I with numpy's 1j. Then convert it back to 
         # a numpy array and append it to the list of eigs. 
-        eigmat = sympy.Matrix(eigmat)
-        I2jfunc = sympy.lambdify((sympy.I),eigmat,modules="numpy")
+        eigmat = sp.Matrix(eigmat)
+        I2jfunc = sp.lambdify((sympy.I),eigmat,modules="numpy")
         eigmat = N.array(I2jfunc(1j))
 
         eigs,vects = N.linalg.eig(eigmat)
         eigarr.append(eigs)
     return N.array(eigarr)
 
-@profile
+
 def driver1(spinfile,interactionfile):
     """generates Hsave"""
     atom_list, jnums, jmats,N_atoms_uc=readfiles.readFiles(interactionfile,spinfile)
@@ -777,7 +790,6 @@ def driver1(spinfile,interactionfile):
     
     return Hsave
 
-@profile
 def driver2(Hsave,direction, steps, kMin, kMax):
     """plots"""
 #    myfilestr=spinfile#r'c:\spins.txt'
@@ -820,14 +832,10 @@ def driver2(Hsave,direction, steps, kMin, kMax):
     print "kz: ", direction['kz']
     qrange = []
     wrange = []
-    
-    qrange = N.arange(kMin, kMax, (kMax - kMin)/steps)
-    wrange.append(calc_eigs_numerically(Hsave,qrange*direction['kx'], qrange*direction['ky'], qrange*direction['kz']))
-    
-#    for q in N.arange(kMin,kMax,(kMax- kMin)/steps):
-##        wrange.append(calc_eigs(Hsave,q*direction['kx'], q*direction['ky'], q*direction['kz']))
-#        wrange.append(calc_eigs_numerically(Hsave,q*direction['kx'], q*direction['ky'], q*direction['kz']))
-#        qrange.append(q)
+    for q in N.arange(kMin,kMax,(kMax- kMin)/steps):
+#        wrange.append(calc_eigs(Hsave,q*direction['kx'], q*direction['ky'], q*direction['kz']))
+        wrange.append(calc_eigs(Hsave,q*direction['kx'], q*direction['ky'], q*direction['kz']))
+        qrange.append(q)
     
     wrange=N.real(wrange)
     wrange=N.array(wrange)
@@ -872,7 +880,7 @@ def driver2(Hsave,direction, steps, kMin, kMax):
     #print steps
     #print spinfile
     #print interactionfile
-@profile
+#@profile
 def profile_driver():
     if 1:
         if 0:
@@ -882,10 +890,6 @@ def profile_driver():
         if 1:
             spinfile=r'C:/Documents and Settings/wflynn/Desktop/spins.txt'
             interactionfile=r'C:/Documents and Settings/wflynn/Desktop/yang_montecarlo.txt'
-        if 0:
-            #NEED TO CHANGE THESE! SPECIFIC TO BILL"S MACHINE
-            spinfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_spins1.txt'#'C:/eig_test_Spins.txt'
-            interactionfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_montecarlo1.txt'
         
         steps=100
         data={}
@@ -894,7 +898,6 @@ def profile_driver():
         data['kz']=0.
         direction=data
         Hsave = driver1(spinfile,interactionfile)
-        sys.exit()
         eigs = Hsave.eigenvals().keys()
         print 'eigs'
         print eigs
@@ -907,9 +910,7 @@ def profile_driver():
         #atom_list=generate_atoms()
         #calculate_dispersion(atom_list,N_atoms_uc,N_atoms,jmats)
         #print jmats
-
-profile_driver()
-
+    
 if __name__=='__main__':
     if 1:
         #translations=generate_translations()
@@ -928,18 +929,15 @@ if __name__=='__main__':
         #spinfile=r'C:/Documents and Settings/wflynn/My Documents/workspace/spinwaves/spinwaves/spinwavecalc/tests/spins_sc.txt'
         #interactionfile=r'C:/Documents and Settings/wflynn/My Documents/workspace/spinwaves/spinwaves/spinwavecalc/tests/montecarlo_sc.txt'
         
-        if 0:
+        
+        if 1:
             #NEED TO CHANGE THESE! SPECIFIC TO BILL"S MACHINE
-            spinfile=r'C:/Documents and Settings/wflynn/Desktop/fm_chain_spins_0.txt'#'C:/eig_test_Spins.txt'
-            interactionfile=r'C:/Documents and Settings/wflynn/Desktop/fm_chain_montecarlo_0.txt'
+            spinfile=r'C:/Documents and Settings/wflynn/Desktop/fm_chain_spins_x.txt'#'C:/eig_test_Spins.txt'
+            interactionfile=r'C:/Documents and Settings/wflynn/Desktop/fm_chain_montecarlo_x.txt'
         if 0:
             spinfile=r'C:/Documents and Settings/wflynn/Desktop/spins.txt'
             interactionfile=r'C:/Documents and Settings/wflynn/Desktop/yang_montecarlo.txt'
-        if 1:
-            #NEED TO CHANGE THESE! SPECIFIC TO BILL"S MACHINE
-            spinfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_spins1.txt'#'C:/eig_test_Spins.txt'
-            interactionfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_montecarlo1.txt'
-
+        
         steps=100
         data={}
         data['kx']=1.
@@ -947,11 +945,11 @@ if __name__=='__main__':
         data['kz']=0.
         direction=data
         Hsave = driver1(spinfile,interactionfile)
-#        sys.exit()
-#        eigs = Hsave.eigenvals().keys()
-#        print 'eigs'
-#        print eigs
-#        printing.generate_output(eigs)
+        sys.exit()
+        eigs = Hsave.eigenvals().keys()
+        print 'eigs'
+        print eigs
+        printing.generate_output(eigs)
         driver2(Hsave,direction,steps,0,2*N.pi)
         #atom_list, jnums, jmats=readfiles.read_interactions(myfilestr,spins)
         #N_atoms=len(atom_list)
