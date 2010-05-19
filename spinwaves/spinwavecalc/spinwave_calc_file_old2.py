@@ -716,15 +716,18 @@ if __name__=='__main__':
         #interactionfile=r'c:\montecarlo_square.txt'
 
         #simple cubic fm
-        spinfile=r'c:\spins_sc.txt'
-        interactionfile=r'c:\montecarlo_sc.txt'
-        
-        #simple cubic afm
-        spinfile=r'c:\spins_sc_afm.txt'
-        interactionfile=r'c:\montecarlo_sc_afm.txt'
-        
-        spinfile=r'C:\Documents and Settings\tsarvey\Desktop\spins.txt'
-        interactionfile=r'C:\Documents and Settings\tsarvey\Desktop\export.txt'
+#        spinfile=r'c:\spins_sc.txt'
+#        interactionfile=r'c:\montecarlo_sc.txt'
+#        
+#        #simple cubic afm
+#        spinfile=r'c:\spins_sc_afm.txt'
+#        interactionfile=r'c:\montecarlo_sc_afm.txt'
+#        
+#        spinfile=r'C:\Documents and Settings\tsarvey\Desktop\spins.txt'
+#        interactionfile=r'C:\Documents and Settings\tsarvey\Desktop\export.txt'
+
+        spinfile=r'C:/Documents and Settings/wflynn/Desktop/fm_chain_spins_x.txt'#'C:/eig_test_Spins.txt'
+        interactionfile=r'C:/Documents and Settings/wflynn/Desktop/fm_chain_montecarlo_x.txt'
         
         steps=100
         data={}

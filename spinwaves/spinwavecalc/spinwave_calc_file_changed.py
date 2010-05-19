@@ -676,19 +676,21 @@ if __name__=='__main__':
          #print spins[0]
         #print spins[1]
         #print N.linalg.det(spins[0]), N.linalg.det(spins[1])
-        spinfile=r'c:\spins.txt'
+#        spinfile=r'c:\spins.txt'
         #spinfile=r'c:\spinsp1.txt'
         #spins=readfiles.read_spins(myfilestr)
-        interactionfile=r'c:\montecarlo.txt'
+#        interactionfile=r'c:\montecarlo.txt'
         #interactionfile=r'c:\montep11.txt'
         #interactionfile=r'c:\montecarlop1.txt'
+        spinfile=r'C:/Documents and Settings/wflynn/Desktop/fm_chain_spins_x.txt'#'C:/eig_test_Spins.txt'
+        interactionfile=r'C:/Documents and Settings/wflynn/Desktop/fm_chain_montecarlo_x.txt'
         steps=100
         data={}
         data['kx']=1.
         data['ky']=0.
         data['kz']=0.
         direction=data
-        driver(spinfile,interactionfile,direction,steps)
+        driver(spinfile,interactionfile,direction,steps,0,2*pi)
         #atom_list, jnums, jmats=readfiles.read_interactions(myfilestr,spins)
         #N_atoms=len(atom_list)
         #N_atoms_uc=1
@@ -696,6 +698,7 @@ if __name__=='__main__':
         #atom_list=generate_atoms()
         #calculate_dispersion(atom_list,N_atoms_uc,N_atoms,jmats)
         #print jmats
+
 
 
 
