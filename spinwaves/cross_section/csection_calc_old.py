@@ -30,7 +30,6 @@ import sympy as sp
 import sympy.matrices as spm
 from sympy import I,pi,exp,oo,sqrt,abs,S,Pow,re,Symbol,Wild
 from sympy.physics.paulialgebra import delta
-from sympy.core.cache import clear_cache
 import numpy as np
 from numpy import arctan2,sin,cos,array
 from numpy import newaxis as nax
@@ -159,12 +158,12 @@ def coeff(expr, term):
         return m2[w]
     
 def coeff_bins(expr,bins):
-    # chop up expr at '+'
-    expr_list = sp.make_list(expr, sp.Add)
-    retbins = np.zeros(len(bins),dtype=object)
     # get rid of None expressions
-    if expr is None or isinstance(expr,int):
-        return retbins
+    if not expr:
+        return 0
+    # chop up expr at '+'
+    expr_list = sympy.make_list(expr, sympy.Add)
+    retbins = N.zeros(len(bins),dtype=object)
     #scan through expr
     for subexpr in expr_list:
         #see if it contains a bin element
@@ -193,123 +192,99 @@ def generate_b_bd_operators(atom_list):
 def generate_a_ad_operators(atom_list, k, b_list, bd_list):
     """Generates a and a dagger operators"""
     a_list = []; ad_list = []
-    a0_list = []; ad0_list = []
     N = len(atom_list)
 
     for i in range(N):
-        a_list.append(exp(I*(QP_SYM*L_SYM - WQP_SYM*T_SYM)) * b_list[i])
-        ad_list.append(exp(-I*(QP_SYM*L_SYM - WQP_SYM*T_SYM)) * bd_list[i])
-        a0_list.append(exp(0) * b_list[i])
-        ad0_list.append(exp(0) * bd_list[i])
+        a_list.append(exp(I*(Q_SYM*L_SYM - WQ_SYM*T_SYM)) * b_list[i])
+        ad_list.append(exp(-I*(Q_SYM*L_SYM - WQ_SYM*T_SYM)) * bd_list[i])
 
     a = Pow(sp.sqrt(N),-1) * sum(a_list)
     ad = Pow(sp.sqrt(N),-1) * sum(ad_list)
-    a0 = Pow(sp.sqrt(N),-1) * sum(a0_list)
-    ad0 = Pow(sp.sqrt(N),-1) * sum(ad0_list)
 
     print "Operators Generated: a, ad"
-    return (a, ad, a0, ad0)
+    return (a,ad)
 
 # Generates the Sp and Sm operators
-def generate_Sp_Sm_operators(atom_list, a, ad, a0, ad0):
+def generate_Sp_Sm_operators(atom_list, a, ad):
     """Generates S+ and S- operators"""
 
     Sp = sqrt(2*S_SYM) * a
     Sm = sqrt(2*S_SYM) * ad
-    Sp0 = sqrt(2*S_SYM) * a0
-    Sm0 = sqrt(2*S_SYM) * ad0
 
     print "Operators Generated: Sp, Sm"
-    return (Sp, Sm, Sp0, Sm0)
+    return (Sp,Sm)
 
-def generate_Sa_Sb_Sn_operators(atom_list, Sp, Sm, Sp0, Sm0):
+def generate_Sa_Sb_Sn_operators(atom_list, Sp, Sm):
     """Generates Sa, Sb, Sn operators"""
 
     Sa = ((1./2.)*(Sp+Sm)).expand()
     Sb = ((1./2.)*(1./I)*(Sp-Sm)).expand()
     Sn = (S_SYM - Pow(2*S_SYM,-1) * Sm.expand() * Sp.expand()).expand()
-    Sa0 = ((1./2.)*(Sp0+Sm0)).expand()
-    Sb0 = ((1./2.)*(1./I)*(Sp0-Sm0)).expand()
-    Sn0 = (S_SYM - Pow(2*S_SYM,-1) * Sm0.expand() * Sp0.expand()).expand()
-    
+
     print "Operators Generated: Sa, Sb, Sn"
-    return (Sa, Sb, Sn, Sa0, Sb0, Sn0)
+    return (Sa, Sb, Sn)
 
 # Generates the Sx, Sy and Sz operators
-def generate_Sx_Sy_Sz_operators(atom_list, Sa, Sb, Sn, Sa0, Sb0, Sn0):
+def generate_Sx_Sy_Sz_operators(atom_list, Sa, Sb, Sn):
     """Generates Sx, Sy and Sz operators"""
     Sx_list = []; Sy_list = []; Sz_list = []
-    Sx0_list = []; Sy0_list = []; Sz0_list = []
     N = len(atom_list)
 
     loc_vect = spm.Matrix([Sa,Sb,Sn])
     loc_vect = loc_vect.reshape(3,1)
-    loc_vect0 = spm.Matrix([Sa0,Sb0,Sn0])
-    loc_vect0 = loc_vect0.reshape(3,1)
 
     for i in range(N):
         rotmat = sp.Matrix(atom_list[i].spinRmatrix)
         glo_vect = rotmat * loc_vect
-        glo_vect0 = rotmat * loc_vect0
 
         Sx = sp.powsimp(glo_vect[0].expand())
         Sy = sp.powsimp(glo_vect[1].expand())
         Sz = sp.powsimp(glo_vect[2].expand())
 
-
         Sx_list.append(Sx)
         Sy_list.append(Sy)
         Sz_list.append(Sz)
-        
-#        if i < 1:
-        if 1:
-            Sx0 = sp.powsimp(glo_vect0[0].expand())
-            Sy0 = sp.powsimp(glo_vect0[1].expand())
-            Sz0 = sp.powsimp(glo_vect0[2].expand())
-            Sx0_list.append(Sx0)
-            Sy0_list.append(Sy0)
-            Sz0_list.append(Sz0)
-          
+            
     Sx_list.append(KAPXHAT_SYM)
     Sy_list.append(KAPYHAT_SYM)
     Sz_list.append(KAPZHAT_SYM)
-    Sx0_list.append(KAPXHAT_SYM)
-    Sy0_list.append(KAPYHAT_SYM)
-    Sz0_list.append(KAPZHAT_SYM)
     
     print "Operators Generated: Sx, Sy, Sz"
-    return (Sx_list,Sy_list,Sz_list,Sx0_list,Sy0_list,Sz0_list)
+    return (Sx_list,Sy_list,Sz_list)
 
 # Define a method that generates the possible combinations of operators
-#def generate_possible_combinations(atom_list, alist):
-def generate_possible_combinations(atom_list, op_list, op_list0):
+def generate_possible_combinations(atom_list, alist):
     """This method returns the possible operator combinations from a list of operators"""
     # For a combination to be returned, the product must have an equal number of b
     # and b dagger operators. If not, they are rejected.
-    res_list = []
+    op_list = []
+    alista = []
     N = len(atom_list)
-    
-    op_list = np.array(op_list)
-    op_list0 = np.array(op_list0)
 
-    for i in range(len(op_list0)):
-        vecti = op_list0[i,-1]
-        for j in range(len(op_list)):
-            vectj = op_list[j,-1]
-            if cmp(vecti,vectj) == 0: delta = 1
+    alista = [[subelement.subs(T_SYM, 0) for subelement in element] for element in alist]
+    for ele in alista:
+        for sub in ele:
+            sub = sub.subs(L_SYM,0)
+
+    for i in range(len(alist)):
+        for j in range(len(alist)):
+            vect1 = alist[i][-1]
+            vect2 = alist[j][-1]
+            if cmp(vect1, vect2) == 0: delta = 1
             else: delta = 0
 
-            res_list.append((op_list0[i,:-1]*op_list[j,:-1]).tolist() + [delta - vecti*vectj])
-    
-    res_list = map(sp.expand, res_list)
-    
+            allzerolist = [alista[i][0].subs(L_SYM,0) for k in range(len(alista[i])-1)]+[delta-vect1*vect2]
+            otherlist = [alist[j][k].subs(Q_SYM,QP_SYM).subs(WQ_SYM,WQP_SYM) for k in range(len(alist[j])-1)]+[1]
+            append_list = list_mult(allzerolist,otherlist)
+            op_list.append(append_list)
     print "Generated: Possible Operator Combinations"
-    return res_list
+    return op_list
 
 #def holstein(Hdef):
 #        S = sympy.Symbol('S',real=True)
 #        print 'holstein'
 #        Hdef=Hdef.expand()
+#        #NEWEST WAY /w bins
 #        coeffs = coeff_bins(Hdef,[S**2,S])
 #        S2coeff,Scoeff = coeffs[0],coeffs[1]
 #        Hlin=None
@@ -318,41 +293,41 @@ def generate_possible_combinations(atom_list, op_list, op_list0):
 #        elif Scoeff==None and S2coeff!=None:
 #            Hlin=S2coeff*S**2
 #        elif Scoeff!=None and S2coeff==None:
-#            #print 'S'
 #            Hlin=Scoeff*S
 #        Hlin = Hlin.expand()
 #        return Hlin
 
  
 def holstein(atom_list, arg):
+    new = []
     N = len(atom_list)
-    arg = np.array(arg)
 
     for k in range(len(arg)):
+        temp = []
         for i in range(N):
             Snew = atom_list[i].spinMagnitude
-            
+
             #gets rid of time independent terms
             #works since arg[k][i] is an Add instance so args breaks it up at '+'s
             pieces = arg[k][i].args
             for piece in pieces:
                 if not piece.has(T_SYM):
-                    arg[k][i] = arg[k][i] - piece             
+                    arg[k][i] = arg[k][i] - piece
 
-            coeffs = coeff_bins(arg[k][i],[S_SYM**2,S_SYM])
-            S2coeff,Scoeff = coeffs[0],coeffs[1]
+            S2coeff = arg[k][i].coeff(S_SYM**2)
+            Scoeff = arg[k][i].coeff(S_SYM)
             if S2coeff != None and Scoeff != None:
-                arg[k][i] = (S2coeff*Snew**2 + Scoeff*Snew)
+                temp.append((S2coeff*S_SYM**2 + Scoeff*S_SYM).subs(S_SYM,Snew))
             elif S2coeff != None and Scoeff == None:
-                arg[k][i] = (S2coeff*Snew**2)
+                temp.append((S2coeff*S_SYM**2).subs(S_SYM,Snew))
             elif S2coeff == None and Scoeff != None:
-                arg[k][i] = (Scoeff*Snew)
-
-    #removes all rows with zeros for each element
-    arg = arg[arg[:,:-1].any(axis=1)]
-    
+                temp.append((Scoeff*S_SYM).subs(S_SYM,Snew))
+        if temp != []:
+            if temp[0] != 0:
+                temp.append(arg[k][-1])
+                new.append(temp)
     print "Applied: Holstein"
-    return arg.tolist()
+    return new
 
 def reduce_options(atom_list, arg):
     """
@@ -360,12 +335,11 @@ def reduce_options(atom_list, arg):
     they are the negative of another combination or they are not time dependent
     (i.e. elastic scattering)
     """
-#    new = []
-#    N = len(atom_list)
-#    for element in arg:
-#        if str(element[0]).find('t') > 0:
-#            new.append(element)
-    new = arg
+    new = []
+    N = len(atom_list)
+    for element in arg:
+        if str(element[0]).find('t') > 0:
+            new.append(element)
 
     for elementa in new:
         if elementa == 0:
@@ -471,7 +445,7 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
 
     # Get Hsave to calculate its eigenvalues
     N_atoms = len(atom_list)
-    Hsave = calculate_dispersion(atom_list,N_atoms_uc,N_atoms,jmats,showEigs=False)
+    Hsave,poly,heigs = calculate_dispersion(atom_list,N_atoms_uc,N_atoms,jmats,showEigs=True)
     print Hsave
     atom_list=atom_list[:N_atoms_uc]
     N_atoms = len(atom_list)
@@ -517,14 +491,14 @@ def generate_cross_section(interactionfile, spinfile, lattice, arg,
     wtlist=w_list
     eig_list=[]
 
-    eig_list = calc_eigs_numerically(Hsave,h_list,k_list,l_list)
-
-    print eig_list.shape 
-
-#    eigs = Hsave.eigenvals().keys()
-#    for q in qlist:
-#        eig_list.append(eigs)
-#    eig_list = np.array(eig_list)
+    eigs = Hsave.eigenvals().keys()
+    for q in qlist:
+        eig_list.append(eigs)
+    eig_list = np.array(eig_list)
+    
+    print 'eig c code'
+    for eig in eig_list[0]:
+        print sp.ccode(eig)
     
     print "Calculated: Eigenvalues"
 
@@ -887,7 +861,11 @@ def single_cross_section_calc(theta, phi, rad, atom_list, csection, tau, eig_lis
 
 
         # evaluate the eigenvalue.
-        eigtemp = sp.abs(eigtemp) #works
+        eigtemp = eigtemp.subs(S_SYM, sp.S(1.0))
+        eigtemp = eigtemp.subs(KX_SYM, kap[0])
+        eigtemp = eigtemp.subs(KY_SYM, kap[1])
+        eigtemp = eigtemp.subs(KZ_SYM, kap[2])
+        eigtemp = sp.abs(eigtemp.evalf(chop=True)) #works
         print eigtemp
         #eigtemp = chop(np.abs(eigtemp))
 
@@ -946,8 +924,10 @@ def single_cross_section_calc(theta, phi, rad, atom_list, csection, tau, eig_lis
     
     # sum over all the different eigenvalues
     csdata = sum(ws)
+    print csdata
 
     #Multiply data by front constants
+    print front_constant
     csdata = front_constant*csdata
     
     # Multiply by form factor
@@ -1162,24 +1142,25 @@ def run_cross_section(interactionfile, spinfile, tau_list, temperature,
     k = spm.Matrix([KX_SYM,KY_SYM,KZ_SYM])
     
     (b,bd) = generate_b_bd_operators(atom_list)
-    (a,ad,a0,ad0) = generate_a_ad_operators(atom_list, k, b, bd)
-    (Sp,Sm,Sp0,Sm0) = generate_Sp_Sm_operators(atom_list, a, ad, a0, ad0)
-    (Sa,Sb,Sn,Sa0,Sb0,Sn0) = generate_Sa_Sb_Sn_operators(atom_list, Sp, Sm, Sp0, Sm0)
-    (Sx,Sy,Sz,Sx0,Sy0,Sz0) = generate_Sx_Sy_Sz_operators(atom_list, Sa, Sb, Sn, Sa0, Sb0, Sn0)
+    (a,ad) = generate_a_ad_operators(atom_list, k, b, bd)
+    (Sp,Sm) = generate_Sp_Sm_operators(atom_list, a, ad)
+    (Sa,Sb,Sn) = generate_Sa_Sb_Sn_operators(atom_list, Sp, Sm)
+    (Sx,Sy,Sz) = generate_Sx_Sy_Sz_operators(atom_list, Sa, Sb, Sn)
     print ''
     
     #Ham = generate_Hamiltonian(N_atoms, atom_list, b, bd)
-    ops = generate_possible_combinations(atom_list, [Sx,Sy,Sz], [Sx0,Sy0,Sz0])
+    ops = generate_possible_combinations(atom_list, [Sx,Sy,Sz])
     ops = holstein(atom_list, ops)
     ops = apply_commutation(atom_list, ops)
     ops = replace_bdb(atom_list, ops)
-    ops = reduce_options(atom_list, ops)
 
+    ops = reduce_options(atom_list, ops)
 #    list_print(ops)
     
     print "prelims complete. generating cross-section","\n"
-    
-   
+
+    end = clock()
+    print ' TIME TIME TIME ', end-start
 
     aa = bb = cc = np.array([2.0*np.pi], 'Float64')
     alpha = beta = gamma = np.array([np.pi/2.0], 'Float64')
@@ -1206,10 +1187,9 @@ def run_cross_section(interactionfile, spinfile, tau_list, temperature,
     (N_atoms_uc,csection,kaprange,
      tau_list,eig_list,kapvect,wtlist,fflist) = generate_cross_section(interactionfile, spinfile, lattice, ops, 
                                                                 tau_list, h_list, k_list, l_list, w_list, temperature)
-  
-    end = clock()
-    print ' TIME TIME TIME ', end-start
-    
+#    print 'CCC',csection
+    c_csection = sp.ccode(csection)
+    print 'ccode',c_csection
     
     return N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wtlist,fflist
 #    end = clock()
@@ -1376,38 +1356,6 @@ def run_spherical_averaging(N_atoms_uc,atom_list,rad,csection,kapvect,tau_list,e
     print res_array
     return xvals,yvals,res_array.T
 
-def correction_driver(interactionfile, spinfile, tau_list, temperature, 
-                      direction=[1,0,0], hkl_interval=[1e-3,2*np.pi,1000], omega_interval=[0,5,1000]):
-    import csection_calc as csc
-    
-    atom_list, jnums, jmats,N_atoms_uc=readFiles(interactionfile,spinfile)
-    
-    atom_list=atom_list[:N_atoms_uc]
-    N_atoms = len(atom_list)
-
-    k = spm.Matrix([KX_SYM,KY_SYM,KZ_SYM])
-    
-    (b,bd) = generate_b_bd_operators(atom_list)
-    (a,ad,a0,ad0) = generate_a_ad_operators(atom_list, k, b, bd)
-    (Sp,Sm,Sp0,Sm0) = generate_Sp_Sm_operators(atom_list, a, ad, a0, ad0)
-    (Sa,Sb,Sn,Sa0,Sb0,Sn0) = generate_Sa_Sb_Sn_operators(atom_list, Sp, Sm, Sp0, Sm0)
-    (Sx,Sy,Sz,Sx0,Sy0,Sz0) = generate_Sx_Sy_Sz_operators(atom_list, Sa, Sb, Sn, Sa0, Sb0, Sn0)
-
-    ops = generate_possible_combinations(atom_list, [Sx,Sy,Sz], [Sx0,Sy0,Sz0])
-    ops = holstein(atom_list, ops)
-    ops = apply_commutation(atom_list, ops)
-    ops = replace_bdb(atom_list, ops)
-    ops1 = reduce_options(atom_list, ops)
-    ops2 = csc.reduce_options(atom_list, ops)
-
-    ops1 = np.array(ops1)
-    ops2 = np.array(ops2)
-    print ops1-ops2
-    print ops1
-    print ops2
-
-    
-
 #---------------- MAIN --------------------------------------------------------- 
 
 ## Methodized version of MAIN 
@@ -1436,8 +1384,6 @@ if __name__=='__main__':
 #def pd():
     #from spinwaves.cross_section.csection_calc import spherical_averaging as sph
     
-    ST = clock()
-    
     file_pathname = os.path.abspath('')
     print file_pathname
     spinfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_spins.txt'#'C:/eig_test_Spins.txt'
@@ -1449,9 +1395,6 @@ if __name__=='__main__':
     tau_list = [np.array([0,0,0])]
 
     atom_list, jnums, jmats,N_atoms_uc=readFiles(interfile,spinfile)
-    
-#    correction_driver(interfile,spinfile,tau_list,temperature)
-#    sys.exit()
     
     N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wt_list,fflist = run_cross_section(interfile,spinfile,tau_list,temperature)
 #    left_conn, right_conn = Pipe()
@@ -1480,11 +1423,7 @@ if __name__=='__main__':
         x,y,z=run_eval_pointwise(N_atoms_uc,csection,kaprange,tau_list,eig_list,kapvect,wt_list,fflist,temperature)
         en = clock()
         print en-st
-        
-        EN = clock()
-        print 'TIME TIME TIME', EN - ST
         plot_cross_section(x,y,z)
-        clear_cache()
         sys.exit()
 
     # ORIGINAL METHOD TO GENERATE CROSS SECTION
