@@ -24,7 +24,7 @@ import spinwaves.spinwavecalc.readfiles as rf
 from timeit import default_timer as time
 from spinwaves.cross_section.csection_calc import plot_cross_section
 
-if 1:
+if 0:
     file_pathname = r'C:\Documents and Settings\wflynn\My Documents\workspace\spinwaves_git\spinwaves\spinwavecalc'#os.path.abspath('')
 
     x = np.load(os.path.join(file_pathname,'oldHlin.txt.npy'))
@@ -171,31 +171,33 @@ if 0:
     print npx
     print npx.shape
 
-if 0:
-    thetas = np.linspace(0,np.pi,25) 
-    phis = np.linspace(0,2*np.pi,25)
-
-    val_func = lambda t,p: 1
-    cs_vals = np.array([[val_func(t,p) for p in phis] for t in thetas])
-    
-    print cs_vals.shape
+if 1:
+#    thetas = np.linspace(0,np.pi,25) 
+#    phis = np.linspace(0,2*np.pi,25)
+#
+#    val_func = lambda t,p: 1
+#    cs_vals = np.array([[val_func(t,p) for p in phis] for t in thetas])
+#    
+#    print cs_vals.shape
 
     file_pathname = r'C:\Documents and Settings\wflynn\My Documents\workspace\spinwaves_git\spinwaves\cross_section'#os.path.abspath('')
 
-    x = np.load(os.path.join(file_pathname,'myfilex.txt.npy'))
-    y = np.load(os.path.join(file_pathname,'myfiley.txt.npy'))
+#    x = np.load(os.path.join(file_pathname,'myfilex.txt.npy'))
+#    y = np.load(os.path.join(file_pathname,'myfiley.txt.npy'))
     z = np.load(os.path.join(file_pathname,'myfilez.txt.npy'))
 #    x = np.load(os.path.join(file_pathname,'testx.txt.npy'))
 #    y = np.load(os.path.join(file_pathname,'testy.txt.npy'))
 #    z = np.load(os.path.join(file_pathname,'testz.txt.npy'))
 
-    print x.shape
-    print y.shape
+#    print x.shape
+#    print y.shape
     print z.shape
     print z
     
-    plt.contourf(x,y,z)
-    plt.show()
+    print z[250,1]
+    
+#    plt.contourf(x,y,z)
+#    plt.show()
 
 
 if 0:

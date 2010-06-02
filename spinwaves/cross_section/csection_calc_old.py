@@ -1386,10 +1386,10 @@ if __name__=='__main__':
     
     file_pathname = os.path.abspath('')
     print file_pathname
-    spinfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_spins.txt'#'C:/eig_test_Spins.txt'
-    interfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_montecarlo.txt'
-#    interfile = os.path.join(file_pathname,r'montecarlo.txt')
-#    spinfile = os.path.join(file_pathname,r'spins.txt')
+#    spinfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_spins.txt'#'C:/eig_test_Spins.txt'
+#    interfile=r'C:/Documents and Settings/wflynn/Desktop/spinwave_test_montecarlo.txt'
+    interfile = os.path.join(file_pathname,r'montecarlo.txt')
+    spinfile = os.path.join(file_pathname,r'spins.txt')
     temperature = 0.0001
 
     tau_list = [np.array([0,0,0])]
